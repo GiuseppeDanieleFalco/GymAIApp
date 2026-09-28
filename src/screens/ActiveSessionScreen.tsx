@@ -8,10 +8,23 @@ import {
     TouchableOpacity,
     Alert,
     Modal,
+    AppState,
+    Vibration,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { getDb } from '../database/db';
+import * as Notifications from 'expo-notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 type RootStackParamList = {
     ActiveSession: { workoutId: string; workoutTitle: string };
@@ -45,6 +58,83 @@ export default function ActiveSessionScreen() {
     const [restTimer, setRestTimer] = useState<number | null>(null);
     const [isRestModalVisible, setIsRestModalVisible] = useState(false);
     const isFinishing = useRef(false);
+    
+    const appState = useRef(AppState.currentState);
+    const lastBackgroundTime = useRef<number | null>(null);
+    const notificationId = useRef<string | null>(null);
+
+    const scheduleNotification = async (seconds: number) => {
+        const { status } = await Notifications.getPermissionsAsync();
+        let finalStatus = status;
+        if (status !== 'granted') {
+            const { status: newStatus } = await Notifications.requestPermissionsAsync();
+            finalStatus = newStatus;
+        }
+        if (finalStatus !== 'granted') return;
+
+        if (notificationId.current) {
+            await Notifications.cancelScheduledNotificationAsync(notificationId.current);
+        }
+
+        const id = await Notifications.scheduleNotificationAsync({
+            content: {
+                title: "Recupero Terminato",
+                body: "Il tuo tempo di recupero è finito, torna ad allenarti! 💪",
+                sound: true,
+            },
+            trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                seconds,
+            },
+        });
+        notificationId.current = id;
+    };
+
+    const cancelNotification = async () => {
+        if (notificationId.current) {
+            await Notifications.cancelScheduledNotificationAsync(notificationId.current);
+            notificationId.current = null;
+        }
+    };
+
+    // Gestione timer in background
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+                if (lastBackgroundTime.current !== null) {
+                    const now = Date.now();
+                    const diffSeconds = Math.floor((now - lastBackgroundTime.current) / 1000);
+                    
+                    if (diffSeconds > 0) {
+                        setElapsedSeconds(prev => prev + diffSeconds);
+                        
+                        setRestTimer(prev => {
+                            if (prev !== null && prev > 0) {
+                                const newRestTime = prev - diffSeconds;
+                                if (newRestTime <= 0) {
+                                    Vibration.vibrate();
+                                    Alert.alert('Recupero Finito', 'Il tempo di recupero è terminato!');
+                                    setIsRestModalVisible(false);
+                                    cancelNotification();
+                                    return 0;
+                                }
+                                return newRestTime;
+                            }
+                            return prev;
+                        });
+                    }
+                }
+            } else if (nextAppState.match(/inactive|background/)) {
+                lastBackgroundTime.current = Date.now();
+            }
+
+            appState.current = nextAppState;
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, []);
 
     // Gestione uscita accidentale dalla schermata
     useEffect(() => {
@@ -92,7 +182,9 @@ export default function ActiveSessionScreen() {
                     return prev - 1;
                 } else {
                     // Timer finito
+                    Vibration.vibrate();
                     setIsRestModalVisible(false);
+                    cancelNotification();
                     return 0;
                 }
             });
@@ -176,8 +268,10 @@ export default function ActiveSessionScreen() {
 
         if (currentSet.completed) {
             // Avvia timer di recupero previsto per l'esercizio
-            setRestTimer(updated[exIndex].rest_seconds);
+            const rest = updated[exIndex].rest_seconds;
+            setRestTimer(rest);
             setIsRestModalVisible(true);
+            scheduleNotification(rest);
         }
 
         setExercises(updated);
@@ -220,23 +314,7 @@ export default function ActiveSessionScreen() {
                         const durationMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
                         const completedAt = new Date().toISOString();
 
-                        // 1. Assicuriamo l'esistenza delle tabelle
-                        await db.execAsync(`
-              CREATE TABLE IF NOT EXISTS workout_logs (
-                id TEXT PRIMARY KEY NOT NULL,
-                workout_id TEXT NOT NULL,
-                duration_minutes INTEGER,
-                completed_at TEXT NOT NULL
-              );
-              CREATE TABLE IF NOT EXISTS set_logs (
-                id TEXT PRIMARY KEY NOT NULL,
-                session_id TEXT NOT NULL,
-                exercise_id TEXT NOT NULL,
-                set_number INTEGER NOT NULL,
-                reps_completed INTEGER NOT NULL,
-                weight_kg REAL NOT NULL
-              );
-            `);
+                        // 1. Assicuriamo l'esistenza delle tabelle (ora gestito in db.ts)
 
                         // 2. Inseriamo la sessione (anche se parziale)
                         await db.runAsync(
@@ -384,7 +462,11 @@ export default function ActiveSessionScreen() {
                     <View style={styles.restModalActions}>
                         <TouchableOpacity 
                             style={styles.restModalButton}
-                            onPress={() => setRestTimer(prev => (prev || 0) + 30)}
+                            onPress={() => setRestTimer(prev => {
+                                const newTime = (prev || 0) + 30;
+                                scheduleNotification(newTime);
+                                return newTime;
+                            })}
                         >
                             <Text style={styles.restModalButtonText}>+30s</Text>
                         </TouchableOpacity>
@@ -394,6 +476,7 @@ export default function ActiveSessionScreen() {
                             onPress={() => {
                                 setRestTimer(0);
                                 setIsRestModalVisible(false);
+                                cancelNotification();
                             }}
                         >
                             <Text style={styles.restModalButtonText}>Salta</Text>

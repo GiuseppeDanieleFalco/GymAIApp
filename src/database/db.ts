@@ -43,6 +43,22 @@ export const initDatabase = async () => {
       order_index INTEGER,
       FOREIGN KEY(workout_id) REFERENCES workouts(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS workout_logs (
+      id TEXT PRIMARY KEY NOT NULL,
+      workout_id TEXT NOT NULL,
+      duration_minutes INTEGER,
+      completed_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS set_logs (
+      id TEXT PRIMARY KEY NOT NULL,
+      session_id TEXT NOT NULL,
+      exercise_id TEXT NOT NULL,
+      set_number INTEGER NOT NULL,
+      reps_completed INTEGER NOT NULL,
+      weight_kg REAL NOT NULL
+    );
   `);
 
   // Migrazione v1: aggiunge workout_groups e group_id a workouts su DB esistenti
