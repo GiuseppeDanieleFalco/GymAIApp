@@ -7,6 +7,7 @@ import {
     TextInput,
     TouchableOpacity,
     Alert,
+    Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
@@ -42,6 +43,37 @@ export default function ActiveSessionScreen() {
     const [exercises, setExercises] = useState<ExerciseItem[]>([]);
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const [restTimer, setRestTimer] = useState<number | null>(null);
+    const [isRestModalVisible, setIsRestModalVisible] = useState(false);
+    const isFinishing = useRef(false);
+
+    // Gestione uscita accidentale dalla schermata
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+            if (isFinishing.current) {
+                // Se stiamo uscendo volontariamente al termine dell'allenamento
+                return;
+            }
+
+            e.preventDefault();
+
+            Alert.alert(
+                'Abbandonare l\'allenamento?',
+                'Sei sicuro di voler uscire? I progressi non salvati andranno persi.',
+                [
+                    { text: 'Annulla', style: 'cancel', onPress: () => {} },
+                    {
+                        text: 'Esci',
+                        style: 'destructive',
+                        onPress: () => {
+                            navigation.dispatch(e.data.action);
+                        },
+                    },
+                ]
+            );
+        });
+
+        return unsubscribe;
+    }, [navigation]);
 
     // Timer Sessione Complessiva
     useEffect(() => {
@@ -55,7 +87,15 @@ export default function ActiveSessionScreen() {
     useEffect(() => {
         if (restTimer === null || restTimer <= 0) return;
         const interval = setInterval(() => {
-            setRestTimer((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+            setRestTimer((prev) => {
+                if (prev !== null && prev > 1) {
+                    return prev - 1;
+                } else {
+                    // Timer finito
+                    setIsRestModalVisible(false);
+                    return 0;
+                }
+            });
         }, 1000);
         return () => clearInterval(interval);
     }, [restTimer]);
@@ -137,6 +177,7 @@ export default function ActiveSessionScreen() {
         if (currentSet.completed) {
             // Avvia timer di recupero previsto per l'esercizio
             setRestTimer(updated[exIndex].rest_seconds);
+            setIsRestModalVisible(true);
         }
 
         setExercises(updated);
@@ -234,6 +275,8 @@ export default function ActiveSessionScreen() {
                             }
                         }
 
+                        isFinishing.current = true;
+
                         Alert.alert('Allenamento Concluso! 💪', 'Sessione salvata nello storico.', [
                             { text: 'OK', onPress: () => navigation.navigate('WorkoutsList') },
                         ]);
@@ -326,6 +369,45 @@ export default function ActiveSessionScreen() {
                     <Text style={styles.finishButtonText}>Termina e Salva Allenamento</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Modale Timer Recupero Full Screen */}
+            <Modal
+                visible={isRestModalVisible}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setIsRestModalVisible(false)}
+            >
+                <View style={styles.restModalContainer}>
+                    <Text style={styles.restModalTitle}>Recupero</Text>
+                    <Text style={styles.restModalTime}>{formatTime(restTimer || 0)}</Text>
+                    
+                    <View style={styles.restModalActions}>
+                        <TouchableOpacity 
+                            style={styles.restModalButton}
+                            onPress={() => setRestTimer(prev => (prev || 0) + 30)}
+                        >
+                            <Text style={styles.restModalButtonText}>+30s</Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity 
+                            style={[styles.restModalButton, styles.restModalButtonSkip]}
+                            onPress={() => {
+                                setRestTimer(0);
+                                setIsRestModalVisible(false);
+                            }}
+                        >
+                            <Text style={styles.restModalButtonText}>Salta</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity 
+                        style={styles.restModalCloseBtn}
+                        onPress={() => setIsRestModalVisible(false)}
+                    >
+                        <Text style={styles.restModalCloseText}>Riduci in background</Text>
+                    </TouchableOpacity>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -408,4 +490,51 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     finishButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+    restModalContainer: {
+        flex: 1,
+        backgroundColor: '#1c1c1e',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    restModalTitle: {
+        color: '#fff',
+        fontSize: 28,
+        fontWeight: 'bold',
+        marginBottom: 40,
+    },
+    restModalTime: {
+        color: '#34C759',
+        fontSize: 96,
+        fontWeight: 'bold',
+        fontVariant: ['tabular-nums'],
+        marginBottom: 60,
+    },
+    restModalActions: {
+        flexDirection: 'row',
+        marginBottom: 40,
+    },
+    restModalButton: {
+        backgroundColor: '#333',
+        paddingVertical: 14,
+        paddingHorizontal: 28,
+        borderRadius: 12,
+        marginHorizontal: 10,
+    },
+    restModalButtonSkip: {
+        backgroundColor: '#ff3b30',
+    },
+    restModalButtonText: {
+        color: '#fff',
+        fontSize: 20,
+        fontWeight: '600',
+    },
+    restModalCloseBtn: {
+        marginTop: 20,
+        padding: 12,
+    },
+    restModalCloseText: {
+        color: '#0a84ff',
+        fontSize: 18,
+    },
 });

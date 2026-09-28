@@ -1,8 +1,12 @@
 import * as SQLite from 'expo-sqlite';
 
+
+let db: SQLite.SQLiteDatabase | null = null;
+
 // 1. Apri (o crea se non esiste) il file di database locale sullo smartphone
 export const getDb = async () => {
-  return await SQLite.openDatabaseAsync('gymai.db');
+  if (db === null) db = await SQLite.openDatabaseAsync('gymai.db');
+  return db;
 };
 
 // 2. Inizializza le tabelle all'avvio dell'app
