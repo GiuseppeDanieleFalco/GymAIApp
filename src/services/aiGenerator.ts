@@ -59,6 +59,8 @@ export const generateWorkoutPlan = async (
     const userPrompt = `
 Genera una scheda di allenamento basata sui seguenti parametri dell'utente:
 - Peso corporeo: ${userInput.weightKg} kg
+- Altezza: ${userInput.heightM} m
+- Età: ${userInput.age} anni
 - Livello di esperienza: ${userInput.experienceLevel}
 - Frequenza: ${userInput.daysPerWeek} giorni a settimana
 - Durata massima sessione: ${userInput.sessionDurationMin} minuti

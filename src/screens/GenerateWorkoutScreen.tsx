@@ -8,6 +8,7 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Alert,
+    Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,7 +16,6 @@ import { AIWorkoutInput } from '../types/workout';
 import { generateWorkoutPlan, saveAIGeneratedPlanToDb } from '../services/aiGenerator';
 import { getAllGroups, createGroup, WorkoutGroup } from '../database/groupQueries';
 
-// Opzioni predefinite per la form
 const EQUIPMENT_OPTIONS = [
     'Manubri',
     'Bilanciere',
@@ -26,6 +26,22 @@ const EQUIPMENT_OPTIONS = [
     'Kettlebell',
     'Macchine Isotoniche',
     'Corpolibero',
+    'Smith Machine (Multipower)',
+    'Leg Press',
+    'Leg Extension',
+    'Leg Curl',
+    'Pectoral Machine',
+    'Lat Machine',
+    'Pulley',
+    'Calf Machine',
+    'Tapis Roulant',
+    'Cyclette',
+    'Ellittica',
+    'Vogatore',
+    'Elastici / Bande',
+    'TRX',
+    'Fitball',
+    'Box Jump',
 ];
 
 const GOAL_OPTIONS: { label: string; value: AIWorkoutInput['goals'] }[] = [
@@ -42,7 +58,9 @@ const EXPERIENCE_OPTIONS: { label: string; value: AIWorkoutInput['experienceLeve
 ];
 
 export default function GenerateWorkoutScreen({ navigation }: any) {
-    const [weightKg, setWeightKg] = useState<string>('75');
+    const [weightKg, setWeightKg] = useState<string>('85');
+    const [heightM, setHeightM] = useState<string>('1.85');
+    const [age, setAge] = useState<number>(25);
     const [experienceLevel, setExperienceLevel] = useState<AIWorkoutInput['experienceLevel']>('intermediate');
     const [daysPerWeek, setDaysPerWeek] = useState<number>(3);
     const [sessionDurationMin, setSessionDurationMin] = useState<number>(60);
@@ -57,7 +75,8 @@ export default function GenerateWorkoutScreen({ navigation }: any) {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [groups, setGroups] = useState<WorkoutGroup[]>([]);
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-
+    const [isEquipmentModalVisible, setIsEquipmentModalVisible] = useState(false);
+    const [customEquipmentText, setCustomEquipmentText] = useState('');
 
     useEffect(() => {
         const loadGroups = async () => {
@@ -113,6 +132,8 @@ export default function GenerateWorkoutScreen({ navigation }: any) {
 
         const payload: AIWorkoutInput = {
             weightKg: Number(weightKg),
+            heightM: Number(heightM),
+            age: Number(age),
             experienceLevel,
             daysPerWeek,
             sessionDurationMin,
@@ -174,7 +195,7 @@ export default function GenerateWorkoutScreen({ navigation }: any) {
                     <Text style={styles.sectionTitle}>1. Informazioni Generali</Text>
 
                     <View style={styles.row}>
-                        <View style={{ flex: 1, marginRight: 10 }}>
+                        <View style={{ flex: 1, marginRight: 5 }}>
                             <Text style={styles.label}>Peso (kg)</Text>
                             <TextInput
                                 style={styles.input}
@@ -182,6 +203,26 @@ export default function GenerateWorkoutScreen({ navigation }: any) {
                                 value={weightKg}
                                 onChangeText={setWeightKg}
                                 placeholder="es. 75"
+                            />
+                        </View>
+                        <View style={{ flex: 1, marginRight: 5 }}>
+                            <Text style={styles.label}>Altezza (m)</Text>
+                            <TextInput
+                                style={styles.input}
+                                keyboardType="numeric"
+                                value={heightM}
+                                onChangeText={setHeightM}
+                                placeholder="es. 1.85"
+                            />
+                        </View>
+                        <View style={{ flex: 1, marginRight: 5 }}>
+                            <Text style={styles.label}>Età (anni)</Text>
+                            <TextInput
+                                style={styles.input}
+                                keyboardType="numeric"
+                                value={String(age)}
+                                onChangeText={(val) => setAge(Number(val))}
+                                placeholder="es. 25"
                             />
                         </View>
 
@@ -251,30 +292,34 @@ export default function GenerateWorkoutScreen({ navigation }: any) {
                 {/* --- 3. ATTREZZATURA DISPONIBILE --- */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>3. Attrezzatura Disponibile</Text>
-                    <Text style={styles.subLabel}>Seleziona ciò a cui hai accesso nella tua struttura o a casa.</Text>
+                    <Text style={styles.subLabel}>Le attrezzature attualmente selezionate sono mostrate di seguito.</Text>
 
                     <View style={styles.chipGroup}>
-                        {EQUIPMENT_OPTIONS.map((item) => {
-                            const isSelected = selectedEquipment.includes(item);
-                            return (
-                                <TouchableOpacity
-                                    key={item}
-                                    style={[styles.chip, isSelected && styles.chipSelected]}
-                                    onPress={() => toggleEquipment(item)}
-                                >
-                                    <Ionicons
-                                        name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
-                                        size={16}
-                                        color={isSelected ? '#FFF' : '#666'}
-                                        style={{ marginRight: 6 }}
-                                    />
-                                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                                        {item}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
+                        {selectedEquipment.map((item) => (
+                            <View
+                                key={item}
+                                style={[styles.chip, styles.chipSelected]}
+                            >
+                                <Ionicons
+                                    name={'checkmark-circle'}
+                                    size={16}
+                                    color={'#FFF'}
+                                    style={{ marginRight: 6 }}
+                                />
+                                <Text style={[styles.chipText, styles.chipTextSelected]}>
+                                    {item}
+                                </Text>
+                            </View>
+                        ))}
                     </View>
+
+                    <TouchableOpacity
+                        style={styles.modifyButton}
+                        onPress={() => setIsEquipmentModalVisible(true)}
+                    >
+                        <Ionicons name="add-circle-outline" size={18} color="#2563EB" style={{ marginRight: 6 }} />
+                        <Text style={styles.modifyButtonText}>Aggiungi/Rimuovi Attrezzi</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* --- 4. LIMITAZIONI & STORICO --- */}
@@ -363,6 +408,76 @@ export default function GenerateWorkoutScreen({ navigation }: any) {
                     )}
                 </TouchableOpacity>
             </ScrollView>
+
+            {/* --- MODALE ATTREZZATURA --- */}
+            <Modal
+                visible={isEquipmentModalVisible}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setIsEquipmentModalVisible(false)}
+            >
+                <SafeAreaView style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Seleziona Attrezzatura</Text>
+                        <TouchableOpacity onPress={() => setIsEquipmentModalVisible(false)}>
+                            <Text style={styles.modalCloseText}>Fine</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <ScrollView contentContainerStyle={styles.modalContent}>
+                        <View style={styles.customEquipmentRow}>
+                            <TextInput
+                                style={styles.customEquipmentInput}
+                                placeholder="Aggiungi attrezzo a mano..."
+                                value={customEquipmentText}
+                                onChangeText={setCustomEquipmentText}
+                                onSubmitEditing={() => {
+                                    const text = customEquipmentText.trim();
+                                    if (text && !selectedEquipment.includes(text)) {
+                                        setSelectedEquipment([...selectedEquipment, text]);
+                                    }
+                                    setCustomEquipmentText('');
+                                }}
+                                returnKeyType="done"
+                            />
+                            <TouchableOpacity
+                                style={styles.customEquipmentAddBtn}
+                                onPress={() => {
+                                    const text = customEquipmentText.trim();
+                                    if (text && !selectedEquipment.includes(text)) {
+                                        setSelectedEquipment([...selectedEquipment, text]);
+                                    }
+                                    setCustomEquipmentText('');
+                                }}
+                            >
+                                <Ionicons name="add" size={24} color="#FFF" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.chipGroup}>
+                            {Array.from(new Set([...EQUIPMENT_OPTIONS, ...selectedEquipment])).map((item) => {
+                                const isSelected = selectedEquipment.includes(item);
+                                return (
+                                    <TouchableOpacity
+                                        key={item}
+                                        style={[styles.chip, isSelected && styles.chipSelected]}
+                                        onPress={() => toggleEquipment(item)}
+                                    >
+                                        <Ionicons
+                                            name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                                            size={16}
+                                            color={isSelected ? '#FFF' : '#666'}
+                                            style={{ marginRight: 6 }}
+                                        />
+                                        <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                                            {item}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </ScrollView>
+                </SafeAreaView>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -507,4 +622,64 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     groupDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+    modifyButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 8,
+        paddingVertical: 8,
+    },
+    modifyButtonText: {
+        color: '#2563EB',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    modalContainer: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+        backgroundColor: '#FFF',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#0F172A',
+    },
+    modalCloseText: {
+        fontSize: 16,
+        color: '#2563EB',
+        fontWeight: '600',
+    },
+    modalContent: {
+        padding: 16,
+    },
+    customEquipmentRow: {
+        flexDirection: 'row',
+        marginBottom: 20,
+    },
+    customEquipmentInput: {
+        flex: 1,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 14,
+        color: '#0F172A',
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+        marginRight: 10,
+    },
+    customEquipmentAddBtn: {
+        backgroundColor: '#2563EB',
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+    },
 });

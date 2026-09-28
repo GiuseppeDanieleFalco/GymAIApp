@@ -1,6 +1,8 @@
 // Input forniti dall'utente nella UI
 export interface AIWorkoutInput {
     weightKg: number;
+    heightM: number;
+    age: number;
     experienceLevel: 'beginner' | 'intermediate' | 'advanced';
     daysPerWeek: number;
     sessionDurationMin: number;
