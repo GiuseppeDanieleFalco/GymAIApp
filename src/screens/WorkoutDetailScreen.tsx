@@ -7,8 +7,10 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Alert,
+    Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { getWorkoutDetails, WorkoutItem, WorkoutExerciseItem } from '../database/workoutQueries';
 import { getDb } from '../database/db';
@@ -18,6 +20,7 @@ export default function WorkoutDetailScreen({ route, navigation }: any) {
     const [workout, setWorkout] = useState<WorkoutItem | null>(null);
     const [exercises, setExercises] = useState<WorkoutExerciseItem[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
+    const [videoSearchQuery, setVideoSearchQuery] = useState<string | null>(null);
 
 
     // Funzione per eliminare la scheda con conferma
@@ -132,16 +135,24 @@ export default function WorkoutDetailScreen({ route, navigation }: any) {
                                 <Text style={styles.exerciseName}>{ex.exercise_name}</Text>
                                 <Text style={styles.equipmentText}>Attrezzo: {ex.equipment || 'Libero'}</Text>
                             </View>
-                            <TouchableOpacity
-                                onPress={() =>
-                                    navigation.navigate('ExerciseProgress', {
-                                        exerciseId: ex.id,
-                                        exerciseName: ex.exercise_name,
-                                    })
-                                }
-                            >
-                                <Text style={{ color: '#007AFF', fontSize: 13 }}>📈 Progressi</Text>
-                            </TouchableOpacity>
+                            <View style={styles.exerciseActions}>
+                                <TouchableOpacity 
+                                    style={styles.videoBtn}
+                                    onPress={() => setVideoSearchQuery(ex.exercise_name)}
+                                >
+                                    <Text style={styles.videoBtnText}>▶ Video</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() =>
+                                        navigation.navigate('ExerciseProgress', {
+                                            exerciseId: ex.id,
+                                            exerciseName: ex.exercise_name,
+                                        })
+                                    }
+                                >
+                                    <Text style={{ color: '#007AFF', fontSize: 13, marginTop: 4 }}>📈 Progressi</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         <View style={styles.statsRow}>
@@ -174,6 +185,29 @@ export default function WorkoutDetailScreen({ route, navigation }: any) {
                     <Text style={styles.startButtonText}>Inizia Allenamento</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Modale Video */}
+            <Modal
+                visible={!!videoSearchQuery}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setVideoSearchQuery(null)}
+            >
+                <View style={styles.videoModalContainer}>
+                    <View style={styles.videoModalHeader}>
+                        <Text style={styles.videoModalTitle}>Tutorial Esercizio</Text>
+                        <TouchableOpacity onPress={() => setVideoSearchQuery(null)}>
+                            <Text style={styles.videoModalCloseBtn}>Chiudi</Text>
+                        </TouchableOpacity>
+                    </View>
+                    {videoSearchQuery && (
+                        <WebView
+                            source={{ uri: `https://www.youtube.com/results?search_query=${encodeURIComponent(videoSearchQuery + ' exercise tutorial')}` }}
+                            style={{ flex: 1 }}
+                        />
+                    )}
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -285,4 +319,41 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     deleteButtonText: { color: '#FF3B30', fontWeight: '600' },
+    exerciseActions: {
+        alignItems: 'flex-end',
+    },
+    videoBtn: {
+        backgroundColor: '#ff0000',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        marginBottom: 4,
+    },
+    videoBtnText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: 'bold',
+    },
+    videoModalContainer: {
+        flex: 1,
+        backgroundColor: '#fff',
+    },
+    videoModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderColor: '#eee',
+        backgroundColor: '#fff',
+    },
+    videoModalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    videoModalCloseBtn: {
+        color: '#007AFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
 });

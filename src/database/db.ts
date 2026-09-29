@@ -59,6 +59,17 @@ export const initDatabase = async () => {
       reps_completed INTEGER NOT NULL,
       weight_kg REAL NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS exercises (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      targetMuscle TEXT,
+      tips TEXT,
+      videoUrl TEXT NOT NULL,
+      thumbnailUrl TEXT,
+      isAiGenerated INTEGER DEFAULT 0
+);
   `);
 
   // Migrazione v1: aggiunge workout_groups e group_id a workouts su DB esistenti

@@ -12,6 +12,7 @@ import {
     Vibration,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { getDb } from '../database/db';
 import * as Notifications from 'expo-notifications';
@@ -57,6 +58,7 @@ export default function ActiveSessionScreen() {
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const [restTimer, setRestTimer] = useState<number | null>(null);
     const [isRestModalVisible, setIsRestModalVisible] = useState(false);
+    const [videoSearchQuery, setVideoSearchQuery] = useState<string | null>(null);
     const isFinishing = useRef(false);
     
     const appState = useRef(AppState.currentState);
@@ -394,7 +396,15 @@ export default function ActiveSessionScreen() {
             <ScrollView style={styles.content}>
                 {exercises.map((ex, exIdx) => (
                     <View key={ex.id} style={styles.exerciseCard}>
-                        <Text style={styles.exerciseName}>{ex.exercise_name}</Text>
+                        <View style={styles.exerciseHeaderRow}>
+                            <Text style={styles.exerciseName}>{ex.exercise_name}</Text>
+                            <TouchableOpacity 
+                                style={styles.videoBtn}
+                                onPress={() => setVideoSearchQuery(ex.exercise_name)}
+                            >
+                                <Text style={styles.videoBtnText}>▶ Video</Text>
+                            </TouchableOpacity>
+                        </View>
                         <Text style={styles.exerciseInfo}>
                             Target: {ex.target_sets} serie x {ex.target_reps} reps | Rest: {ex.rest_seconds}s
                         </Text>
@@ -491,6 +501,29 @@ export default function ActiveSessionScreen() {
                     </TouchableOpacity>
                 </View>
             </Modal>
+
+            {/* Modale Video */}
+            <Modal
+                visible={!!videoSearchQuery}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setVideoSearchQuery(null)}
+            >
+                <View style={styles.videoModalContainer}>
+                    <View style={styles.videoModalHeader}>
+                        <Text style={styles.videoModalTitle}>Tutorial Esercizio</Text>
+                        <TouchableOpacity onPress={() => setVideoSearchQuery(null)}>
+                            <Text style={styles.videoModalCloseBtn}>Chiudi</Text>
+                        </TouchableOpacity>
+                    </View>
+                    {videoSearchQuery && (
+                        <WebView
+                            source={{ uri: `https://www.youtube.com/results?search_query=${encodeURIComponent(videoSearchQuery + ' exercise tutorial')}` }}
+                            style={{ flex: 1 }}
+                        />
+                    )}
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -525,7 +558,24 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         elevation: 2,
     },
-    exerciseName: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50' },
+    exerciseHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    exerciseName: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50', flex: 1 },
+    videoBtn: {
+        backgroundColor: '#ff0000',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    videoBtnText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
     exerciseInfo: { fontSize: 12, color: '#7f8c8d', marginBottom: 12 },
     tableHeader: {
         flexDirection: 'row',
@@ -619,5 +669,27 @@ const styles = StyleSheet.create({
     restModalCloseText: {
         color: '#0a84ff',
         fontSize: 18,
+    },
+    videoModalContainer: {
+        flex: 1,
+        backgroundColor: '#fff',
+    },
+    videoModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderColor: '#eee',
+        backgroundColor: '#fff',
+    },
+    videoModalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    videoModalCloseBtn: {
+        color: '#007AFF',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
