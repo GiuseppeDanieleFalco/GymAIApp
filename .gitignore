@@ -36,6 +36,9 @@ yarn-error.*
 .env.development
 .env.production
 
+# eas json
+eas.json
+
 # typescript
 *.tsbuildinfo
 

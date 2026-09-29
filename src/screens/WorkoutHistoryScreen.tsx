@@ -6,6 +6,7 @@ import {
     FlatList,
     ActivityIndicator,
     TouchableOpacity,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getDb } from '../database/db';
@@ -23,6 +24,64 @@ interface HistorySession {
         exercise_id: string;
     }[];
 }
+
+const formatDate = (isoString: string) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    return date.toLocaleDateString('it-IT', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+};
+
+const HistoryItem = ({ item, navigation, onDelete }: { item: HistorySession, navigation: any, onDelete: (id: string) => void }) => {
+    const [expanded, setExpanded] = useState(false);
+
+    return (
+        <TouchableOpacity style={styles.card} onPress={() => setExpanded(!expanded)} activeOpacity={0.8}>
+            <View style={styles.cardHeader}>
+                <Text style={styles.workoutTitle}>{item.workout_title}</Text>
+                <TouchableOpacity onPress={() => onDelete(item.id)} style={styles.deleteButton}>
+                    <Text style={styles.deleteIcon}>🗑️</Text>
+                </TouchableOpacity>
+            </View>
+
+            <View style={styles.cardSubHeader}>
+                <Text style={styles.dateText}>{formatDate(item.completed_at)}</Text>
+                <Text style={styles.durationText}>⏱ {item.duration_minutes} min</Text>
+            </View>
+
+            {expanded && (
+                <>
+                    <View style={styles.divider} />
+                    <Text style={styles.sectionLabel}>Dettaglio Serie:</Text>
+                    {item.set_logs.map((log, idx) => (
+                        <TouchableOpacity
+                            key={idx}
+                            style={styles.logRow}
+                            onPress={() =>
+                                navigation.navigate('ExerciseProgress', {
+                                    exerciseId: log.exercise_id,
+                                    exerciseName: log.exercise_name,
+                                })
+                            }
+                        >
+                            <Text style={styles.exerciseName}>
+                                {log.exercise_name || 'Esercizio'}
+                            </Text>
+                            <Text style={styles.logDetails}>
+                                Set #{log.set_number}: <Text style={styles.bold}>{log.weight_kg} kg</Text> x {log.reps_completed} reps
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </>
+            )}
+        </TouchableOpacity>
+    );
+};
 
 export default function WorkoutHistoryScreen({ navigation }: any) {
     const [history, setHistory] = useState<HistorySession[]>([]);
@@ -89,19 +148,34 @@ export default function WorkoutHistoryScreen({ navigation }: any) {
     };
 
     useEffect(() => {
-        fetchHistory();
-    }, []);
-
-    const formatDate = (isoString: string) => {
-        if (!isoString) return '';
-        const date = new Date(isoString);
-        return date.toLocaleDateString('it-IT', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchHistory();
         });
+        return unsubscribe;
+    }, [navigation]);
+
+    const deleteSession = (id: string) => {
+        Alert.alert(
+            "Elimina sessione",
+            "Sei sicuro di voler eliminare questa sessione di allenamento?",
+            [
+                { text: "Annulla", style: "cancel" },
+                {
+                    text: "Elimina",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            const db = await getDb();
+                            await db.runAsync('DELETE FROM set_logs WHERE session_id = ?', [id]);
+                            await db.runAsync('DELETE FROM workout_logs WHERE id = ?', [id]);
+                            fetchHistory();
+                        } catch (error) {
+                            console.error('Errore durante l\'eliminazione:', error);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     if (loading) {
@@ -126,45 +200,13 @@ export default function WorkoutHistoryScreen({ navigation }: any) {
                     keyExtractor={(item) => item.id}
                     contentContainerStyle={{ paddingBottom: 20 }}
                     renderItem={({ item }) => (
-                        <View style={styles.card}>
-                            <View style={styles.cardHeader}>
-                                <Text style={styles.workoutTitle}>{item.workout_title}</Text>
-                                <Text style={styles.dateText}>{formatDate(item.completed_at)}</Text>
-                            </View>
-
-                            <Text style={styles.durationText}>
-                                ⏱ Durata: {item.duration_minutes} min
-                            </Text>
-
-                            <View style={styles.divider} />
-
-                            <Text style={styles.sectionLabel}>Dettaglio Serie:</Text>
-                            {item.set_logs.map((log, idx) => (
-                                <TouchableOpacity
-                                    key={idx}
-                                    style={styles.logRow}
-                                    onPress={() =>
-                                        navigation.navigate('ExerciseProgress', {
-                                            exerciseId: log.exercise_id,
-                                            exerciseName: log.exercise_name,
-                                        })
-                                    }
-                                >
-                                    <Text style={styles.exerciseName}>
-                                        {log.exercise_name || 'Esercizio'}
-                                    </Text>
-                                    <Text style={styles.logDetails}>
-                                        Set #{log.set_number}: <Text style={styles.bold}>{log.weight_kg} kg</Text> x {log.reps_completed} reps
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+                        <HistoryItem item={item} navigation={navigation} onDelete={deleteSession} />
                     )}
                 />
             )}
         </SafeAreaView>
     );
-};
+}
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f4f4f6', padding: 16 },
@@ -181,10 +223,13 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 5,
     },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    cardSubHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     workoutTitle: { fontSize: 16, fontWeight: 'bold', color: '#007AFF', flex: 1 },
+    deleteButton: { padding: 4 },
+    deleteIcon: { fontSize: 18 },
     dateText: { fontSize: 12, color: '#8e8e93' },
-    durationText: { fontSize: 13, color: '#555', marginTop: 4 },
+    durationText: { fontSize: 13, color: '#555' },
     divider: { height: 1, backgroundColor: '#eee', marginVertical: 10 },
     sectionLabel: { fontSize: 12, fontWeight: '600', color: '#8e8e93', marginBottom: 6 },
     logRow: {
