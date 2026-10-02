@@ -15,17 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { getDb } from '../database/db';
-import * as Notifications from 'expo-notifications';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+import notifee, { AndroidImportance, EventType, TriggerType } from '@notifee/react-native';
+import type { TimestampTrigger } from '@notifee/react-native';
 
 type RootStackParamList = {
     ActiveSession: { workoutId: string; workoutTitle: string };
@@ -60,43 +51,48 @@ export default function ActiveSessionScreen() {
     const [isRestModalVisible, setIsRestModalVisible] = useState(false);
     const [videoSearchQuery, setVideoSearchQuery] = useState<string | null>(null);
     const isFinishing = useRef(false);
-    
+
     const appState = useRef(AppState.currentState);
     const lastBackgroundTime = useRef<number | null>(null);
     const notificationId = useRef<string | null>(null);
 
     const scheduleNotification = async (seconds: number) => {
-        const { status } = await Notifications.getPermissionsAsync();
-        let finalStatus = status;
-        if (status !== 'granted') {
-            const { status: newStatus } = await Notifications.requestPermissionsAsync();
-            finalStatus = newStatus;
-        }
-        if (finalStatus !== 'granted') return;
+        const settings = await notifee.requestPermission();
+        if (!settings.authorizationStatus) return;
 
         if (notificationId.current) {
-            await Notifications.cancelScheduledNotificationAsync(notificationId.current);
+            await notifee.cancelNotification(notificationId.current);
+            notificationId.current = null;
         }
 
-        const id = await Notifications.scheduleNotificationAsync({
-            content: {
-                title: "Recupero Terminato",
-                body: "Il tuo tempo di recupero è finito, torna ad allenarti! 💪",
-                sound: true,
-            },
-            trigger: {
-                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                seconds,
-            },
+        const channelId = await notifee.createChannel({
+            id: 'rest-end',
+            name: 'Recupero Terminato',
+            importance: AndroidImportance.HIGH,
         });
+
+        const trigger: TimestampTrigger = {
+            type: TriggerType.TIMESTAMP,
+            timestamp: Date.now() + seconds * 1000,
+        };
+
+        const id = await notifee.createTriggerNotification(
+            {
+                title: 'Recupero Terminato',
+                body: 'Il tuo tempo di recupero è finito, torna ad allenarti! 💪',
+                android: { channelId, sound: 'default' },
+            },
+            trigger
+        );
         notificationId.current = id;
     };
 
     const cancelNotification = async () => {
         if (notificationId.current) {
-            await Notifications.cancelScheduledNotificationAsync(notificationId.current);
+            await notifee.cancelNotification(notificationId.current);
             notificationId.current = null;
         }
+        await notifee.stopForegroundService().catch(() => { });
     };
 
     // Gestione timer in background
@@ -106,10 +102,10 @@ export default function ActiveSessionScreen() {
                 if (lastBackgroundTime.current !== null) {
                     const now = Date.now();
                     const diffSeconds = Math.floor((now - lastBackgroundTime.current) / 1000);
-                    
+
                     if (diffSeconds > 0) {
                         setElapsedSeconds(prev => prev + diffSeconds);
-                        
+
                         setRestTimer(prev => {
                             if (prev !== null && prev > 0) {
                                 const newRestTime = prev - diffSeconds;
@@ -152,7 +148,7 @@ export default function ActiveSessionScreen() {
                 'Abbandonare l\'allenamento?',
                 'Sei sicuro di voler uscire? I progressi non salvati andranno persi.',
                 [
-                    { text: 'Annulla', style: 'cancel', onPress: () => {} },
+                    { text: 'Annulla', style: 'cancel', onPress: () => { } },
                     {
                         text: 'Esci',
                         style: 'destructive',
@@ -167,6 +163,42 @@ export default function ActiveSessionScreen() {
         return unsubscribe;
     }, [navigation]);
 
+    // Teniamo il valore corrente del restTimer in un ref in modo che il
+    // handler di notifee (registrato una sola volta) possa sempre leggere
+    // il valore aggiornato senza dipendere da closure stantie.
+    const restTimerRef = useRef<number | null>(null);
+    useEffect(() => { restTimerRef.current = restTimer; }, [restTimer]);
+
+    const add30s = () => {
+        const newTime = (restTimerRef.current || 0) + 30;
+        setRestTimer(newTime);
+        scheduleNotification(newTime);
+    };
+
+    // Registra il listener UNA SOLA VOLTA e lo rimuove allo smontaggio
+    useEffect(() => {
+        const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
+            if (type === EventType.ACTION_PRESS && detail?.pressAction?.id) {
+                switch (detail.pressAction.id) {
+                    case 'REST_TIMER_ADD_30S':
+                        add30s();
+                        break;
+                    case 'REST_TIMER_STOP':
+                        jumpTimer();
+                        break;
+                }
+            }
+        });
+        return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const jumpTimer = () => {
+        setRestTimer(0);
+        setIsRestModalVisible(false);
+        cancelNotification();
+    };
+
     // Timer Sessione Complessiva
     useEffect(() => {
         const timer = setInterval(() => {
@@ -174,6 +206,45 @@ export default function ActiveSessionScreen() {
         }, 1000);
         return () => clearInterval(timer);
     }, []);
+
+    // Aggiorna la notifica foreground in tempo reale
+    useEffect(() => {
+        if (restTimer !== null && restTimer > 0) {
+            const updateNotification = async () => {
+                try {
+                    const channelId = await notifee.createChannel({
+                        id: 'timer',
+                        name: 'Timer Recupero',
+                        importance: AndroidImportance.LOW,
+                    });
+                    const min = Math.floor(restTimer / 60);
+                    const sec = restTimer % 60;
+                    const formatted = `${min}:${sec.toString().padStart(2, '0')}`;
+
+                    await notifee.displayNotification({
+                        id: 'rest-timer',
+                        title: '⏳ Recupero in corso',
+                        body: `Tempo rimanente: ${formatted}`,
+                        android: {
+                            channelId,
+                            asForegroundService: true,
+                            ongoing: true,
+                            color: '#3498db',
+                            actions: [
+                                { title: '+30s', pressAction: { id: 'REST_TIMER_ADD_30S', launchActivity: 'default', } },
+                                { title: 'Stop', pressAction: { id: 'REST_TIMER_STOP', launchActivity: 'default', } }
+                            ],
+                        },
+                    });
+                } catch (e) {
+                    console.log('Errore Notifee:', e);
+                }
+            };
+            updateNotification();
+        } else if (restTimer === 0) {
+            notifee.stopForegroundService().catch(() => { });
+        }
+    }, [restTimer]);
 
     // Timer Recupero
     useEffect(() => {
@@ -398,7 +469,7 @@ export default function ActiveSessionScreen() {
                     <View key={ex.id} style={styles.exerciseCard}>
                         <View style={styles.exerciseHeaderRow}>
                             <Text style={styles.exerciseName}>{ex.exercise_name}</Text>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={styles.videoBtn}
                                 onPress={() => setVideoSearchQuery(ex.exercise_name)}
                             >
@@ -468,32 +539,24 @@ export default function ActiveSessionScreen() {
                 <View style={styles.restModalContainer}>
                     <Text style={styles.restModalTitle}>Recupero</Text>
                     <Text style={styles.restModalTime}>{formatTime(restTimer || 0)}</Text>
-                    
+
                     <View style={styles.restModalActions}>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={styles.restModalButton}
-                            onPress={() => setRestTimer(prev => {
-                                const newTime = (prev || 0) + 30;
-                                scheduleNotification(newTime);
-                                return newTime;
-                            })}
+                            onPress={add30s}
                         >
                             <Text style={styles.restModalButtonText}>+30s</Text>
                         </TouchableOpacity>
-                        
-                        <TouchableOpacity 
+
+                        <TouchableOpacity
                             style={[styles.restModalButton, styles.restModalButtonSkip]}
-                            onPress={() => {
-                                setRestTimer(0);
-                                setIsRestModalVisible(false);
-                                cancelNotification();
-                            }}
+                            onPress={jumpTimer}
                         >
                             <Text style={styles.restModalButtonText}>Salta</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={styles.restModalCloseBtn}
                         onPress={() => setIsRestModalVisible(false)}
                     >
