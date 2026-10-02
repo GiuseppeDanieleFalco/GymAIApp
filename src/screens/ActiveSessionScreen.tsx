@@ -10,6 +10,7 @@ import {
     Modal,
     AppState,
     Vibration,
+    Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -56,36 +57,39 @@ export default function ActiveSessionScreen() {
     const lastBackgroundTime = useRef<number | null>(null);
     const notificationId = useRef<string | null>(null);
 
-    const scheduleNotification = async (seconds: number) => {
-        const settings = await notifee.requestPermission();
-        if (!settings.authorizationStatus) return;
+    // --- Animated progress bar ---
+    const progressAnim = useRef(new Animated.Value(1)).current;
+    const barOpacity = useRef(new Animated.Value(0)).current;
+    const completionAnim = useRef(new Animated.Value(0)).current;
+    const initialRestTimeRef = useRef<number>(0);
+    const prevRestTimerForProgressRef = useRef<number | null>(null);
+    const showRestBarRef = useRef(false);
+    const [showRestBar, setShowRestBar] = useState(false);
 
-        if (notificationId.current) {
-            await notifee.cancelNotification(notificationId.current);
-            notificationId.current = null;
-        }
-
-        const channelId = await notifee.createChannel({
-            id: 'rest-end',
-            name: 'Recupero Terminato',
-            importance: AndroidImportance.HIGH,
-        });
-
-        const trigger: TimestampTrigger = {
-            type: TriggerType.TIMESTAMP,
-            timestamp: Date.now() + seconds * 1000,
-        };
-
-        const id = await notifee.createTriggerNotification(
+    const showNotification = async () => {
+        await notifee.displayNotification(
             {
                 title: 'Recupero Terminato',
                 body: 'Il tuo tempo di recupero è finito, torna ad allenarti! 💪',
-                android: { channelId, sound: 'default' },
-            },
-            trigger
+                android: { channelId: 'rest-end', sound: 'default' },
+            }
         );
-        notificationId.current = id;
     };
+
+    // Richiede i permessi e crea il canale UNA SOLA VOLTA al mount,
+    // così scheduleNotification può essere chiamata in modo più leggero
+    // senza round-trip nativi aggiuntivi.
+    useEffect(() => {
+        const init = async () => {
+            await notifee.requestPermission();
+            await notifee.createChannel({
+                id: 'rest-end',
+                name: 'Recupero Terminato',
+                importance: AndroidImportance.HIGH,
+            });
+        };
+        init().catch(console.error);
+    }, []);
 
     const cancelNotification = async () => {
         if (notificationId.current) {
@@ -99,6 +103,9 @@ export default function ActiveSessionScreen() {
     useEffect(() => {
         const subscription = AppState.addEventListener('change', nextAppState => {
             if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+                // Torniamo in foreground: annulla il trigger (l'in-app timer si occupa del resto)
+                cancelNotification();
+
                 if (lastBackgroundTime.current !== null) {
                     const now = Date.now();
                     const diffSeconds = Math.floor((now - lastBackgroundTime.current) / 1000);
@@ -113,7 +120,6 @@ export default function ActiveSessionScreen() {
                                     Vibration.vibrate();
                                     Alert.alert('Recupero Finito', 'Il tempo di recupero è terminato!');
                                     setIsRestModalVisible(false);
-                                    cancelNotification();
                                     return 0;
                                 }
                                 return newRestTime;
@@ -124,6 +130,9 @@ export default function ActiveSessionScreen() {
                 }
             } else if (nextAppState.match(/inactive|background/)) {
                 lastBackgroundTime.current = Date.now();
+                // Non schedular qui: l'operazione async potrebbe non completarsi
+                // prima che il thread JS venga sospeso. Il trigger viene invece
+                // schedulato nel momento in cui la serie viene spuntata (foreground).
             }
 
             appState.current = nextAppState;
@@ -132,6 +141,7 @@ export default function ActiveSessionScreen() {
         return () => {
             subscription.remove();
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Gestione uscita accidentale dalla schermata
@@ -169,15 +179,72 @@ export default function ActiveSessionScreen() {
     const restTimerRef = useRef<number | null>(null);
     useEffect(() => { restTimerRef.current = restTimer; }, [restTimer]);
 
+    // Gestisce animazione della progress bar del recupero
+    useEffect(() => {
+        const prev = prevRestTimerForProgressRef.current;
+
+        if (restTimer !== null && restTimer > 0) {
+            if (prev === null || prev === 0) {
+                // Nuovo timer avviato: fade-in + reset
+                initialRestTimeRef.current = restTimer;
+                progressAnim.setValue(1);
+                completionAnim.setValue(0);
+                showRestBarRef.current = true;
+                setShowRestBar(true);
+                barOpacity.setValue(0);
+                Animated.timing(barOpacity, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: false,
+                }).start();
+            } else if (initialRestTimeRef.current > 0) {
+                // Tick: aggiorna la barra in modo fluido
+                const progress = restTimer / initialRestTimeRef.current;
+                Animated.timing(progressAnim, {
+                    toValue: Math.max(0, progress),
+                    duration: 900,
+                    useNativeDriver: false,
+                }).start();
+            }
+        } else if (restTimer === 0 && showRestBarRef.current) {
+            // Timer completato: snap a 100% verde, 3 pulse, poi fade-out
+            progressAnim.setValue(1);
+            completionAnim.setValue(1);
+            Animated.sequence([
+                Animated.timing(barOpacity, { toValue: 0.2, duration: 120, useNativeDriver: false }),
+                Animated.timing(barOpacity, { toValue: 1.0, duration: 120, useNativeDriver: false }),
+                Animated.timing(barOpacity, { toValue: 0.2, duration: 120, useNativeDriver: false }),
+                Animated.timing(barOpacity, { toValue: 1.0, duration: 120, useNativeDriver: false }),
+                Animated.timing(barOpacity, { toValue: 0.2, duration: 120, useNativeDriver: false }),
+                Animated.timing(barOpacity, { toValue: 1.0, duration: 120, useNativeDriver: false }),
+                Animated.timing(barOpacity, { toValue: 0, duration: 600, useNativeDriver: false }),
+            ]).start(() => {
+                showRestBarRef.current = false;
+                setShowRestBar(false);
+            });
+        }
+
+        prevRestTimerForProgressRef.current = restTimer;
+    }, [restTimer]);
+
     const add30s = () => {
         const newTime = (restTimerRef.current || 0) + 30;
         setRestTimer(newTime);
-        scheduleNotification(newTime);
     };
 
     // Registra il listener UNA SOLA VOLTA e lo rimuove allo smontaggio
     useEffect(() => {
         const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
+            // Se il trigger 'rest-end' viene consegnato mentre l'app è in foreground,
+            // lo cancelliamo subito: in-app timer + vibrazione gestiscono già la fine.
+            if (type === EventType.DELIVERED &&
+                detail.notification?.id &&
+                detail.notification.id === notificationId.current) {
+                await notifee.cancelNotification(detail.notification.id);
+                notificationId.current = null;
+                return;
+            }
+
             if (type === EventType.ACTION_PRESS && detail?.pressAction?.id) {
                 switch (detail.pressAction.id) {
                     case 'REST_TIMER_ADD_30S':
@@ -190,7 +257,7 @@ export default function ActiveSessionScreen() {
             }
         });
         return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const jumpTimer = () => {
@@ -258,6 +325,7 @@ export default function ActiveSessionScreen() {
                     Vibration.vibrate();
                     setIsRestModalVisible(false);
                     cancelNotification();
+                    showNotification();
                     return 0;
                 }
             });
@@ -340,11 +408,11 @@ export default function ActiveSessionScreen() {
         currentSet.completed = !currentSet.completed;
 
         if (currentSet.completed) {
-            // Avvia timer di recupero previsto per l'esercizio
+            // Avvia timer di recupero e schedula il trigger SUBITO in foreground
+            // (scheduling asincrono durante la transizione background sarebbe inaffidabile)
             const rest = updated[exIndex].rest_seconds;
             setRestTimer(rest);
             setIsRestModalVisible(true);
-            scheduleNotification(rest);
         }
 
         setExercises(updated);
@@ -448,19 +516,40 @@ export default function ActiveSessionScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Header con Timer Complessivo e Timer Recupero */}
+            {/* Header con Timer Complessivo e Progress Bar Recupero */}
             <View style={styles.header}>
-                <View>
-                    <Text style={styles.title}>{workoutTitle}</Text>
-                    <Text style={styles.timerText}>
-                        ⏱ Tempo: {formatTime(elapsedSeconds)}
-                    </Text>
-                </View>
-                {restTimer !== null && (
-                    <View style={styles.restBadge}>
-                        <Text style={styles.restLabel}>Recupero</Text>
-                        <Text style={styles.restTime}>{formatTime(restTimer)}</Text>
+                <View style={styles.headerTop}>
+                    <View>
+                        <Text style={styles.title}>{workoutTitle}</Text>
+                        <Text style={styles.timerText}>
+                            ⏱ Tempo: {formatTime(elapsedSeconds)}
+                        </Text>
                     </View>
+                    {showRestBar && (
+                        <Animated.View style={[styles.restInfo, { opacity: barOpacity }]}>
+                            <Text style={styles.restLabel}>Recupero</Text>
+                            <Text style={styles.restTime}>{formatTime(restTimer || 0)}</Text>
+                        </Animated.View>
+                    )}
+                </View>
+                {showRestBar && (
+                    <Animated.View style={[styles.restProgressTrack, { opacity: barOpacity }]}>
+                        <Animated.View
+                            style={[
+                                styles.restProgressFill,
+                                {
+                                    width: progressAnim.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: ['0%', '100%'],
+                                    }),
+                                    backgroundColor: completionAnim.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: ['#007AFF', '#34C759'],
+                                    }),
+                                },
+                            ]}
+                        />
+                    </Animated.View>
                 )}
             </View>
 
@@ -594,25 +683,35 @@ export default function ActiveSessionScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f4f4f6' },
     header: {
-        padding: 16,
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 0,
         backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderColor: '#e0e0e0',
+    },
+    headerTop: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        paddingBottom: 12,
     },
     title: { fontSize: 18, fontWeight: 'bold', color: '#1c1c1e' },
     timerText: { fontSize: 14, color: '#007AFF', fontWeight: '600', marginTop: 4 },
-    restBadge: {
-        backgroundColor: '#34C759',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
-        alignItems: 'center',
+    restInfo: { alignItems: 'flex-end' },
+    restLabel: { color: '#8e8e93', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+    restTime: { color: '#007AFF', fontSize: 16, fontWeight: 'bold', marginTop: 2 },
+    restProgressTrack: {
+        height: 7,
+        backgroundColor: '#e5e5ea',
+        borderRadius: 4,
+        overflow: 'hidden',
+        marginBottom: 12,
     },
-    restLabel: { color: '#fff', fontSize: 10, textTransform: 'uppercase' },
-    restTime: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+    restProgressFill: {
+        height: 7,
+        borderRadius: 4,
+    },
     content: { flex: 1, padding: 16 },
     exerciseCard: {
         backgroundColor: '#fff',
