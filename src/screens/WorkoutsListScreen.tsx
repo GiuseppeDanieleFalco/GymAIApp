@@ -9,6 +9,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getAllWorkouts, WorkoutItem } from '../database/workoutQueries';
 import { getAllGroups, assignWorkoutToGroup, WorkoutGroup } from '../database/groupQueries';
 import { getDb } from '../database/db';
+import { useActiveSessionStore } from '../store/activeSessionStore';
 
 type WorkoutSection = {
     groupId: string | null;
@@ -24,6 +25,9 @@ export default function WorkoutsListScreen({ navigation }: any) {
     const [assignTarget, setAssignTarget] = useState<WorkoutItem | null>(null);
     const [toShow, setToShow] = useState<string[]>([]);
 
+    const activeSessionStore = useActiveSessionStore();
+    const activeWorkoutId = activeSessionStore.workoutId;
+    const activeWorkoutTitle = activeSessionStore.workoutTitle;
 
     const toggleSection = (groupId: string) => {
         if (toShow.includes(groupId)) {
@@ -209,6 +213,20 @@ export default function WorkoutsListScreen({ navigation }: any) {
                     </TouchableOpacity>
                 </View>
             </View>
+
+            {activeWorkoutId && (
+                <TouchableOpacity
+                    style={styles.activeSessionBanner}
+                    onPress={() => navigation.navigate('ActiveSession', { workoutId: activeWorkoutId, workoutTitle: activeWorkoutTitle })}
+                >
+                    <Ionicons name="play-circle" size={28} color="#fff" />
+                    <View style={styles.activeSessionBannerTextContainer}>
+                        <Text style={styles.activeSessionTitle}>Sessione in corso</Text>
+                        <Text style={styles.activeSessionSubtitle}>{activeWorkoutTitle}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={24} color="#fff" />
+                </TouchableOpacity>
+            )}
 
             <SectionList
                 sections={sections}
@@ -426,4 +444,32 @@ const styles = StyleSheet.create({
         alignItems: 'center', marginTop: 10,
     },
     cancelText: { fontSize: 15, fontWeight: '600', color: '#475569' },
+    activeSessionBanner: {
+        backgroundColor: '#007AFF',
+        marginHorizontal: 16,
+        marginBottom: 16,
+        borderRadius: 12,
+        padding: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        elevation: 3,
+        shadowColor: '#007AFF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+    },
+    activeSessionBannerTextContainer: {
+        flex: 1,
+        marginLeft: 12,
+    },
+    activeSessionTitle: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    activeSessionSubtitle: {
+        color: '#E5E7EB',
+        fontSize: 14,
+        marginTop: 2,
+    },
 });

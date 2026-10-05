@@ -18,6 +18,7 @@ import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { getDb } from '../database/db';
 import notifee, { AndroidImportance, EventType, TriggerType } from '@notifee/react-native';
 import type { TimestampTrigger } from '@notifee/react-native';
+import { useActiveSessionStore, ExerciseItem } from '../store/activeSessionStore';
 
 type RootStackParamList = {
     ActiveSession: { workoutId: string; workoutTitle: string };
@@ -32,22 +33,16 @@ interface SetInput {
     completed: boolean;
 }
 
-interface ExerciseItem {
-    id: string;
-    exercise_name: string;
-    target_sets: number;
-    target_reps: string;
-    rest_seconds: number;
-    sets: SetInput[];
-}
-
 export default function ActiveSessionScreen() {
     const route = useRoute<ActiveSessionRouteProp>();
     const navigation = useNavigation<any>();
     const { workoutId, workoutTitle } = route.params;
 
-    const [exercises, setExercises] = useState<ExerciseItem[]>([]);
-    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    const activeSessionStore = useActiveSessionStore();
+    const isResumingRef = useRef(activeSessionStore.workoutId === workoutId && activeSessionStore.exercises.length > 0);
+
+    const [exercises, setExercises] = useState<ExerciseItem[]>(isResumingRef.current ? activeSessionStore.exercises : []);
+    const [elapsedSeconds, setElapsedSeconds] = useState(isResumingRef.current && activeSessionStore.startTime ? Math.floor((Date.now() - activeSessionStore.startTime) / 1000) : 0);
     const [restTimer, setRestTimer] = useState<number | null>(null);
     const [isRestModalVisible, setIsRestModalVisible] = useState(false);
     const [videoSearchQuery, setVideoSearchQuery] = useState<string | null>(null);
@@ -337,6 +332,8 @@ export default function ActiveSessionScreen() {
     // Caricamento Esercizi con precompilazione degli ultimi pesi usati
     useEffect(() => {
         const loadExercises = async () => {
+            if (isResumingRef.current) return; // Se stiamo riprendendo una sessione, usa i dati dello store
+
             try {
                 const db = await getDb();
 
@@ -401,6 +398,18 @@ export default function ActiveSessionScreen() {
 
         loadExercises();
     }, [workoutId]);
+
+    // Salva le modifiche allo store ogni volta che 'exercises' cambia
+    useEffect(() => {
+        if (exercises.length > 0) {
+            if (activeSessionStore.workoutId !== workoutId) {
+                const start = Date.now() - (elapsedSeconds * 1000);
+                activeSessionStore.setSession(workoutId, workoutTitle, exercises, start);
+            } else {
+                activeSessionStore.updateExerciseSets(exercises);
+            }
+        }
+    }, [exercises]);
 
     const toggleSetComplete = (exIndex: number, setIndex: number) => {
         const updated = [...exercises];
@@ -495,6 +504,7 @@ export default function ActiveSessionScreen() {
                         }
 
                         isFinishing.current = true;
+                        activeSessionStore.clearSession(); // Pulisce lo store dopo il salvataggio
 
                         Alert.alert('Allenamento Concluso! 💪', 'Sessione salvata nello storico.', [
                             { text: 'OK', onPress: () => navigation.navigate('WorkoutsList') },
