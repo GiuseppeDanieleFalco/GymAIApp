@@ -560,20 +560,20 @@ export default function ActiveSessionScreen() {
         return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
+    const totalPlannedSets = exercises.reduce((total, ex) => total + ex.sets.length, 0);
+    const completedSetsCount = exercises.reduce((total, ex) => total + ex.sets.filter((s) => s.completed).length, 0);
+
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
-                {/* Header con Timer Complessivo e Progress Bar Recupero */}
                 <View style={styles.header}>
                     <View style={styles.headerTop}>
-                        <View>
+                        <View style={styles.titleWrap}>
+                            <Text style={styles.kicker}>Workout</Text>
                             <Text style={styles.title}>{workoutTitle}</Text>
-                            <Text style={styles.timerText}>
-                                ⏱ Tempo: {formatTime(elapsedSeconds)}
-                            </Text>
                         </View>
                         {showRestBar && (
                             <Animated.View style={[styles.restInfo, { opacity: barOpacity }]}>
@@ -582,6 +582,18 @@ export default function ActiveSessionScreen() {
                             </Animated.View>
                         )}
                     </View>
+
+                    <View style={styles.summaryRow}>
+                        <View style={styles.metricPill}>
+                            <Text style={styles.metricLabel}>Tempo</Text>
+                            <Text style={styles.metricValue}>{formatTime(elapsedSeconds)}</Text>
+                        </View>
+                        <View style={styles.metricPill}>
+                            <Text style={styles.metricLabel}>Serie</Text>
+                            <Text style={styles.metricValue}>{completedSetsCount}/{totalPlannedSets}</Text>
+                        </View>
+                    </View>
+
                     {showRestBar && (
                         <Animated.View style={[styles.restProgressTrack, { opacity: barOpacity }]}>
                             <Animated.View
@@ -594,7 +606,7 @@ export default function ActiveSessionScreen() {
                                         }),
                                         backgroundColor: completionAnim.interpolate({
                                             inputRange: [0, 1],
-                                            outputRange: ['#007AFF', '#34C759'],
+                                            outputRange: ['#4f46e5', '#22c55e'],
                                         }),
                                     },
                                 ]}
@@ -603,108 +615,125 @@ export default function ActiveSessionScreen() {
                     )}
                 </View>
 
-                <ScrollView style={styles.content}>
-                    {exercises.map((ex, exIdx) => (
-                        <View key={ex.id} style={styles.exerciseCard}>
-                            <View style={styles.exerciseHeaderRow}>
-                                <Text style={styles.exerciseName}>{ex.exercise_name}</Text>
-                                <TouchableOpacity
-                                    style={styles.videoBtn}
-                                    onPress={() => setVideoSearchQuery(ex.exercise_name)}
-                                >
-                                    <Text style={styles.videoBtnText}>▶ Video</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <Text style={styles.exerciseInfo}>
-                                Target: {ex.target_sets} serie x {ex.target_reps} reps | Rest: {ex.rest_seconds}s
-                            </Text>
+                <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+                    {exercises.map((ex, exIdx) => {
+                        const completedThisExercise = ex.sets.filter((s) => s.completed).length;
 
-                            {/* Immagini esercizio: start + end position affiancate */}
-                            {ex.image_urls && ex.image_urls.length > 0 ? (
-                                <View style={styles.exerciseImagesRow}>
-                                    {ex.image_urls.map((url, imgIdx) => (
-                                        <Image
-                                            key={imgIdx}
-                                            source={{ uri: url }}
-                                            style={[
-                                                styles.exerciseImageThumb,
-                                                ex.image_urls!.length === 1 && styles.exerciseImageFull,
-                                            ]}
-                                            resizeMode="contain"
-                                        />
-                                    ))}
-                                </View>
-                            ) : null}
-
-                            {(ex.primaryMuscles?.length || ex.secondaryMuscles?.length) ? (
-                                <Text style={styles.exerciseInfo}>
-                                    Muscoli principali: {ex.primaryMuscles?.join(', ') || 'Nessuno'}
-                                    {ex.secondaryMuscles?.length ? ` | Secondari: ${ex.secondaryMuscles.join(', ')}` : ''}
-                                </Text>
-                            ) : null}
-
-                            {ex.instructions && ex.instructions.length > 0 && (
-                                <View style={styles.instructionsBlock}>
-                                    <Text style={styles.instructionsTitle}>Istruzioni</Text>
-                                    {ex.instructions.map((instruction, index) => (
-                                        <Text key={`${ex.id}-instruction-${index}`} style={styles.instructionText}>
-                                            {index + 1}. {instruction}
-                                        </Text>
-                                    ))}
-                                </View>
-                            )}
-
-                            {/* Intestazione Tabella Serie */}
-                            <View style={styles.tableHeader}>
-                                <Text style={[styles.colHeader, { width: 50 }]}>Serie</Text>
-                                <Text style={[styles.colHeader, { flex: 1 }]}>Kg</Text>
-                                <Text style={[styles.colHeader, { flex: 1 }]}>Reps</Text>
-                                <Text style={[styles.colHeader, { width: 60, textAlign: 'center' }]}>Fatto</Text>
-                            </View>
-
-                            {/* Righe Serie */}
-                            {ex.sets.map((s, setIdx) => (
-                                <View
-                                    key={setIdx}
-                                    style={[
-                                        styles.setRow,
-                                        s.completed && styles.setRowCompleted,
-                                    ]}
-                                >
-                                    <Text style={styles.setNumber}>#{s.setNumber}</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        keyboardType="numeric"
-                                        value={s.weightKg}
-                                        onChangeText={(val) => updateSetData(exIdx, setIdx, 'weightKg', val)}
-                                    />
-                                    <TextInput
-                                        style={styles.input}
-                                        keyboardType="numeric"
-                                        value={s.reps}
-                                        onChangeText={(val) => updateSetData(exIdx, setIdx, 'reps', val)}
-                                    />
+                        return (
+                            <View
+                                key={ex.id}
+                                style={[
+                                    styles.exerciseCard,
+                                    completedThisExercise === ex.sets.length && styles.exerciseCardCompleted,
+                                ]}
+                            >
+                                <View style={styles.exerciseHeaderRow}>
+                                    <View style={styles.exerciseTitleWrap}>
+                                        <Text style={styles.exerciseIndex}>E{exIdx + 1}</Text>
+                                        <Text style={styles.exerciseName}>{ex.exercise_name}</Text>
+                                    </View>
                                     <TouchableOpacity
-                                        style={[styles.checkBtn, s.completed && styles.checkBtnActive]}
-                                        onPress={() => toggleSetComplete(exIdx, setIdx)}
+                                        style={styles.videoBtn}
+                                        onPress={() => setVideoSearchQuery(ex.exercise_name)}
                                     >
-                                        <Text style={styles.checkBtnText}>{s.completed ? '✓' : ''}</Text>
+                                        <Text style={styles.videoBtnText}>▶ Video</Text>
                                     </TouchableOpacity>
                                 </View>
-                            ))}
-                        </View>
-                    ))}
+
+                                <View style={styles.exerciseMetaRow}>
+                                    <Text style={styles.metaPill}>{ex.target_sets} set</Text>
+                                    <Text style={styles.metaPill}>{ex.target_reps} reps</Text>
+                                    <Text style={styles.metaPill}>{ex.rest_seconds}s rest</Text>
+                                </View>
+
+                                {ex.image_urls && ex.image_urls.length > 0 ? (
+                                    <View style={styles.exerciseImagesRow}>
+                                        {ex.image_urls.map((url, imgIdx) => (
+                                            <Image
+                                                key={imgIdx}
+                                                source={{ uri: url }}
+                                                style={[
+                                                    styles.exerciseImageThumb,
+                                                    ex.image_urls!.length === 1 && styles.exerciseImageFull,
+                                                ]}
+                                                resizeMode="contain"
+                                            />
+                                        ))}
+                                    </View>
+                                ) : null}
+
+                                {(ex.primaryMuscles?.length || ex.secondaryMuscles?.length) ? (
+                                    <Text style={styles.exerciseInfo}>
+                                        Muscoli principali: {ex.primaryMuscles?.join(', ') || 'Nessuno'}
+                                        {ex.secondaryMuscles?.length ? ` · Secondari: ${ex.secondaryMuscles.join(', ')}` : ''}
+                                    </Text>
+                                ) : null}
+
+                                {ex.instructions && ex.instructions.length > 0 && (
+                                    <View style={styles.instructionsBlock}>
+                                        <Text style={styles.instructionsTitle}>Istruzioni</Text>
+                                        {ex.instructions.map((instruction, index) => (
+                                            <Text key={`${ex.id}-instruction-${index}`} style={styles.instructionText}>
+                                                {index + 1}. {instruction}
+                                            </Text>
+                                        ))}
+                                    </View>
+                                )}
+
+                                <View style={styles.tableHeader}>
+                                    <Text style={[styles.colHeader, { width: 38 }]}>#</Text>
+                                    <Text style={[styles.colHeader, { flex: 1 }]}>Kg</Text>
+                                    <Text style={[styles.colHeader, { flex: 1 }]}>Reps</Text>
+                                    <Text style={[styles.colHeader, { width: 42, textAlign: 'center' }]}>✓</Text>
+                                </View>
+
+                                {ex.sets.map((s, setIdx) => (
+                                    <View
+                                        key={setIdx}
+                                        style={[
+                                            styles.setRow,
+                                            s.completed && styles.setRowCompleted,
+                                        ]}
+                                    >
+                                        <Text style={styles.setNumber}>{s.setNumber}</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            keyboardType="numeric"
+                                            value={s.weightKg}
+                                            onChangeText={(val) => updateSetData(exIdx, setIdx, 'weightKg', val)}
+                                            placeholder="0"
+                                            placeholderTextColor="#9aa3af"
+                                        />
+                                        <TextInput
+                                            style={styles.input}
+                                            keyboardType="numeric"
+                                            value={s.reps}
+                                            onChangeText={(val) => updateSetData(exIdx, setIdx, 'reps', val)}
+                                            placeholder="0"
+                                            placeholderTextColor="#9aa3af"
+                                        />
+                                        <TouchableOpacity
+                                            style={[styles.checkBtn, s.completed && styles.checkBtnActive]}
+                                            onPress={() => toggleSetComplete(exIdx, setIdx)}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={styles.checkBtnText}>{s.completed ? '✓' : ''}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+                            </View>
+                        );
+                    })}
                 </ScrollView>
 
-                {/* Pulsante di fine sessione */}
                 <View style={styles.footer}>
                     <TouchableOpacity style={styles.finishButton} onPress={handleFinishWorkout}>
-                        <Text style={styles.finishButtonText}>Termina e Salva Allenamento</Text>
+                        <Text style={styles.finishButtonText}>Termina e salva allenamento</Text>
+                        <Text style={styles.finishButtonSubtext}>{completedSetsCount} / {totalPlannedSets} serie completate</Text>
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
 
-            {/* Modale Timer Recupero Full Screen */}
             <Modal
                 visible={isRestModalVisible}
                 animationType="slide"
@@ -740,7 +769,6 @@ export default function ActiveSessionScreen() {
                 </View>
             </Modal>
 
-            {/* Modale Video */}
             <Modal
                 visible={!!videoSearchQuery}
                 animationType="slide"
@@ -749,7 +777,7 @@ export default function ActiveSessionScreen() {
             >
                 <View style={styles.videoModalContainer}>
                     <View style={styles.videoModalHeader}>
-                        <Text style={styles.videoModalTitle}>Tutorial Esercizio</Text>
+                        <Text style={styles.videoModalTitle}>Tutorial esercizio</Text>
                         <TouchableOpacity onPress={() => setVideoSearchQuery(null)}>
                             <Text style={styles.videoModalCloseBtn}>Chiudi</Text>
                         </TouchableOpacity>
@@ -767,180 +795,373 @@ export default function ActiveSessionScreen() {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f4f4f6' },
+    container: {
+        flex: 1,
+        backgroundColor: '#eef4ff',
+    },
     header: {
         paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 0,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderColor: '#e0e0e0',
+        paddingTop: 12,
+        paddingBottom: 10,
+        backgroundColor: '#f8fafc',
+        borderBottomLeftRadius: 18,
+        borderBottomRightRadius: 18,
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 2,
     },
     headerTop: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingBottom: 12,
+        alignItems: 'flex-start',
+        marginBottom: 10,
     },
-    title: { fontSize: 18, fontWeight: 'bold', color: '#1c1c1e' },
-    timerText: { fontSize: 14, color: '#007AFF', fontWeight: '600', marginTop: 4 },
-    restInfo: { alignItems: 'flex-end' },
-    restLabel: { color: '#8e8e93', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
-    restTime: { color: '#007AFF', fontSize: 16, fontWeight: 'bold', marginTop: 2 },
+    titleWrap: {
+        flex: 1,
+        paddingRight: 12,
+    },
+    kicker: {
+        color: '#64748b',
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
+        marginBottom: 6,
+    },
+    title: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#0f172a',
+        letterSpacing: -0.2,
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 8,
+    },
+    metricPill: {
+        flex: 1,
+        backgroundColor: '#f1f5f9',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 14,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+    },
+    metricLabel: {
+        color: '#64748b',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.8,
+        textTransform: 'uppercase',
+        marginBottom: 2,
+    },
+    metricValue: {
+        color: '#0f172a',
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    restInfo: {
+        alignItems: 'flex-end',
+        backgroundColor: '#eff6ff',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#bfdbfe',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        minWidth: 92,
+    },
+    restLabel: {
+        color: '#475569',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.8,
+        textTransform: 'uppercase',
+    },
+    restTime: {
+        color: '#1d4ed8',
+        fontSize: 18,
+        fontWeight: '800',
+        marginTop: 4,
+    },
     restProgressTrack: {
-        height: 7,
-        backgroundColor: '#e5e5ea',
-        borderRadius: 4,
+        height: 9,
+        backgroundColor: 'rgba(148, 163, 184, 0.18)',
+        borderRadius: 999,
         overflow: 'hidden',
-        marginBottom: 12,
     },
     restProgressFill: {
-        height: 7,
-        borderRadius: 4,
+        height: 9,
+        borderRadius: 999,
     },
-    content: { flex: 1, padding: 16 },
+    content: {
+        flex: 1,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+    },
+    contentContainer: {
+        paddingBottom: 20,
+    },
     exerciseCard: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
+        backgroundColor: '#ffffff',
+        borderRadius: 20,
         padding: 14,
-        marginBottom: 16,
-        elevation: 2,
+        marginBottom: 18,
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: '#edf2f7',
+    },
+    exerciseCardCompleted: {
+        borderColor: '#c7f9d1',
+        backgroundColor: '#f8fff9',
     },
     exerciseHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        marginBottom: 12,
+    },
+    exerciseTitleWrap: {
+        flex: 1,
+        paddingRight: 10,
+    },
+    exerciseIndex: {
+        color: '#4f46e5',
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 0.7,
+        textTransform: 'uppercase',
         marginBottom: 4,
     },
-    exerciseName: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50', flex: 1 },
+    exerciseName: {
+        fontSize: 19,
+        fontWeight: '800',
+        color: '#111827',
+        flex: 1,
+    },
     videoBtn: {
-        backgroundColor: '#ff0000',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 6,
+        backgroundColor: '#ef4444',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 999,
     },
     videoBtnText: {
         color: '#fff',
-        fontSize: 12,
-        fontWeight: 'bold',
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 0.2,
+    },
+    exerciseMetaRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginBottom: 12,
+        gap: 8,
+    },
+    metaPill: {
+        backgroundColor: '#eef2ff',
+        color: '#4338ca',
+        fontSize: 11,
+        fontWeight: '700',
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        overflow: 'hidden',
     },
     exerciseImage: {
         width: '100%',
         height: 200,
-        borderRadius: 8,
+        borderRadius: 16,
         marginBottom: 12,
-        backgroundColor: '#f9f9f9',
     },
     exerciseImagesRow: {
         flexDirection: 'row',
-        gap: 6,
+        gap: 8,
         marginBottom: 12,
     },
     exerciseImageThumb: {
         flex: 1,
         height: 160,
-        borderRadius: 8,
-        backgroundColor: '#f0f0f0',
+        borderRadius: 16,
+        backgroundColor: '#f3f4f6',
     },
     exerciseImageFull: {
         height: 200,
     },
-    exerciseInfo: { fontSize: 12, color: '#7f8c8d', marginBottom: 12 },
-    instructionsBlock: { marginBottom: 12 },
-    instructionsTitle: { fontSize: 13, fontWeight: '700', color: '#2c3e50', marginBottom: 4 },
-    instructionText: { fontSize: 12, color: '#555', lineHeight: 18, marginBottom: 3 },
+    exerciseInfo: {
+        fontSize: 12,
+        color: '#475569',
+        marginBottom: 12,
+        lineHeight: 18,
+    },
+    instructionsBlock: {
+        marginBottom: 14,
+        paddingHorizontal: 4,
+    },
+    instructionsTitle: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#111827',
+        marginBottom: 6,
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+    },
+    instructionText: {
+        fontSize: 12,
+        color: '#475569',
+        lineHeight: 18,
+        marginBottom: 3,
+    },
     tableHeader: {
         flexDirection: 'row',
         borderBottomWidth: 1,
-        borderColor: '#eee',
-        paddingBottom: 6,
+        borderColor: '#e5e7eb',
+        paddingBottom: 8,
         marginBottom: 8,
+        alignItems: 'center',
     },
-    colHeader: { fontSize: 12, fontWeight: '600', color: '#8e8e93' },
+    colHeader: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#64748b',
+        letterSpacing: 0.4,
+        textTransform: 'uppercase',
+    },
     setRow: {
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 8,
-        paddingVertical: 4,
+        paddingVertical: 6,
+        paddingHorizontal: 6,
+        borderRadius: 12,
     },
-    setRowCompleted: { backgroundColor: '#e8f5e9', borderRadius: 6 },
-    setNumber: { width: 50, fontWeight: '600', color: '#555' },
+    setRowCompleted: {
+        backgroundColor: '#eefff2',
+    },
+    setNumber: {
+        width: 38,
+        fontWeight: '800',
+        color: '#334155',
+        fontSize: 13,
+    },
     input: {
         flex: 1,
-        backgroundColor: '#f0f0f5',
-        borderRadius: 6,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        backgroundColor: '#f8fafc',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        paddingHorizontal: 10,
+        paddingVertical: 8,
         marginHorizontal: 4,
         textAlign: 'center',
-        fontWeight: 'bold',
+        fontWeight: '700',
+        color: '#0f172a',
+        fontSize: 14,
     },
     checkBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 34,
+        height: 34,
+        borderRadius: 17,
         borderWidth: 2,
-        borderColor: '#c7c7cc',
+        borderColor: '#cbd5e1',
+        backgroundColor: '#fff',
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: 8,
+        marginLeft: 6,
     },
-    checkBtnActive: { backgroundColor: '#34C759', borderColor: '#34C759' },
-    checkBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-    footer: { padding: 16, backgroundColor: '#fff', borderTopWidth: 1, borderColor: '#eee' },
-    finishButton: {
-        backgroundColor: '#007AFF',
+    checkBtnActive: {
+        backgroundColor: '#22c55e',
+        borderColor: '#22c55e',
+    },
+    checkBtnText: {
+        color: '#fff',
+        fontWeight: '900',
+        fontSize: 15,
+    },
+    footer: {
+        paddingHorizontal: 16,
         paddingVertical: 14,
-        borderRadius: 10,
-        alignItems: 'center',
+        backgroundColor: '#f8fbff',
+        borderTopWidth: 1,
+        borderColor: '#dfeaf6',
     },
-    finishButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+    finishButton: {
+        backgroundColor: '#2563eb',
+        paddingVertical: 16,
+        borderRadius: 16,
+        alignItems: 'center',
+        shadowColor: '#2563eb',
+        shadowOpacity: 0.18,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 4,
+    },
+    finishButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '800',
+        letterSpacing: 0.2,
+        textTransform: 'uppercase',
+    },
+    finishButtonSubtext: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 11,
+        fontWeight: '700',
+        marginTop: 4,
+        letterSpacing: 0.4,
+    },
     restModalContainer: {
         flex: 1,
-        backgroundColor: '#1c1c1e',
+        backgroundColor: '#0f172a',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
     },
     restModalTitle: {
-        color: '#fff',
+        color: '#f8fafc',
         fontSize: 28,
-        fontWeight: 'bold',
-        marginBottom: 40,
+        fontWeight: '800',
+        marginBottom: 26,
     },
     restModalTime: {
-        color: '#34C759',
+        color: '#34d399',
         fontSize: 96,
-        fontWeight: 'bold',
+        fontWeight: '800',
         fontVariant: ['tabular-nums'],
-        marginBottom: 60,
+        marginBottom: 54,
     },
     restModalActions: {
         flexDirection: 'row',
-        marginBottom: 40,
+        marginBottom: 30,
     },
     restModalButton: {
-        backgroundColor: '#333',
+        backgroundColor: '#1e293b',
         paddingVertical: 14,
         paddingHorizontal: 28,
-        borderRadius: 12,
+        borderRadius: 14,
         marginHorizontal: 10,
     },
     restModalButtonSkip: {
-        backgroundColor: '#ff3b30',
+        backgroundColor: '#ef4444',
     },
     restModalButtonText: {
         color: '#fff',
-        fontSize: 20,
-        fontWeight: '600',
+        fontSize: 18,
+        fontWeight: '700',
     },
     restModalCloseBtn: {
-        marginTop: 20,
+        marginTop: 16,
         padding: 12,
     },
     restModalCloseText: {
-        color: '#0a84ff',
-        fontSize: 18,
+        color: '#93c5fd',
+        fontSize: 16,
+        fontWeight: '700',
     },
     videoModalContainer: {
         flex: 1,
@@ -952,16 +1173,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderColor: '#eee',
+        borderColor: '#e5e7eb',
         backgroundColor: '#fff',
     },
     videoModalTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
+        fontWeight: '800',
+        color: '#0f172a',
     },
     videoModalCloseBtn: {
-        color: '#007AFF',
-        fontSize: 16,
-        fontWeight: '600',
+        color: '#2563eb',
+        fontSize: 15,
+        fontWeight: '700',
     },
 });
