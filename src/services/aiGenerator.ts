@@ -1,5 +1,6 @@
 import { getDb } from '../database/db';
 import { AIWorkoutInput, AIGeneratedWorkoutPlan } from '../types/workout';
+import { findExerciseImageUrl, findExerciseMetadata } from './exerciseImageLookup';
 
 // 1. Lettura della chiave API di Gemini dalle variabili d'ambiente Expo
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_AI_KEY;
@@ -21,6 +22,7 @@ REGOLE FONDAMENTALI:
 4. Adatta la selezione degli esercizi ESCLUSIVAMENTE all'attrezzatura dichiarata disponibile.
 5. Includi sempre nel campo "disclaimer" la seguente dicitura obbligatoria:
    "Questo piano di allenamento è un suggerimento generato automaticamente sulla base dei parametri inseriti. Non sostituisce il parere di un medico o di un professionista del fitness qualificato. Prima di iniziare, assicurati di avere un certificato medico idoneo all'attività sportiva."
+6. Usa nomi di esercizi standard, preferibilmente in inglese (es. "Barbell Bench Press", "Squat", "Pull Up"), per facilitare il ritrovamento delle immagini corrispondenti nel database. Non inventare nomi.
 
 SCHEMA JSON OBBLIGATORIO:
 {
@@ -127,6 +129,9 @@ Genera una scheda di allenamento basata sui seguenti parametri dell'utente:
 export const saveAIGeneratedPlanToDb = async (plan: AIGeneratedWorkoutPlan, groupId?: string | null) => {
     const db = await getDb();
 
+    // Fetch exercise DB for real image mapping
+    // (now handled by the shared exerciseImageLookup service)
+
     await db.withTransactionAsync(async () => {
         let dayIndex = 1;
 
@@ -144,9 +149,19 @@ export const saveAIGeneratedPlanToDb = async (plan: AIGeneratedWorkoutPlan, grou
             let exerciseIndex = 0;
             for (const ex of day.exercises) {
                 const exerciseId = `ex_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+                // Cerca metadati completi (immagini + muscoli + categoria + livello)
+                const meta = await findExerciseMetadata(ex.exercise_name);
+                const imageUrl = meta?.images?.[0]
+                    ? `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${meta.images[0]}`
+                    : null;
+
                 await db.runAsync(
-                    `INSERT INTO workout_exercises (id, workout_id, exercise_name, equipment, target_sets, target_reps, rest_seconds, order_index)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+                    `INSERT INTO workout_exercises
+                     (id, workout_id, exercise_name, equipment, target_sets, target_reps, rest_seconds, order_index,
+                      image_url, primary_muscles, secondary_muscles, force, mechanic, category, level, exercise_db_id,
+                      instructions, images)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
                     [
                         exerciseId,
                         workoutId,
@@ -156,6 +171,16 @@ export const saveAIGeneratedPlanToDb = async (plan: AIGeneratedWorkoutPlan, grou
                         ex.target_reps,
                         ex.rest_seconds,
                         exerciseIndex++,
+                        imageUrl,
+                        meta ? JSON.stringify(meta.primaryMuscles) : null,
+                        meta ? JSON.stringify(meta.secondaryMuscles) : null,
+                        meta?.force ?? null,
+                        meta?.mechanic ?? null,
+                        meta?.category ?? null,
+                        meta?.level ?? null,
+                        meta?.id ?? null,
+                        meta ? JSON.stringify(meta.instructions) : null,
+                        meta ? JSON.stringify(meta.images) : null,
                     ]
                 );
             }

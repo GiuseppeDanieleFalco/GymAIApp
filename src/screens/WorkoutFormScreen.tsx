@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     StyleSheet,
     Text,
@@ -7,11 +7,15 @@ import {
     TouchableOpacity,
     ScrollView,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
+    FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { getDb } from '../database/db';
 import { createGroup, getAllGroups, WorkoutGroup } from '../database/groupQueries';
+import { searchExercises, findExerciseMetadata, ExerciseDbEntry } from '../services/exerciseImageLookup';
 
 interface ExerciseFormItem {
     id?: string;
@@ -19,6 +23,8 @@ interface ExerciseFormItem {
     target_sets: string;
     target_reps: string;
     rest_seconds: string;
+    // Metadata from free-exercise-db (set when user picks from autocomplete)
+    dbMeta?: ExerciseDbEntry | null;
 }
 
 export default function WorkoutFormScreen() {
@@ -36,6 +42,8 @@ export default function WorkoutFormScreen() {
     const [loading, setLoading] = useState(false);
     const [groups, setGroups] = useState<WorkoutGroup[]>([]);
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+    // Autocomplete: suggestions per index
+    const [suggestions, setSuggestions] = useState<Record<number, ExerciseDbEntry[]>>({});
 
     useEffect(() => {
         loadGroups();
@@ -102,6 +110,19 @@ export default function WorkoutFormScreen() {
                             target_sets: String(ex.target_sets || 3),
                             target_reps: String(ex.target_reps || '10'),
                             rest_seconds: String(ex.rest_seconds || 60),
+                            dbMeta: ex.exercise_db_id ? {
+                                id: ex.exercise_db_id,
+                                name: ex.exercise_name,
+                                force: ex.force ?? null,
+                                level: ex.level ?? '',
+                                mechanic: ex.mechanic ?? null,
+                                equipment: ex.equipment ?? null,
+                                primaryMuscles: JSON.parse(ex.primary_muscles || '[]'),
+                                secondaryMuscles: JSON.parse(ex.secondary_muscles || '[]'),
+                                instructions: JSON.parse(ex.instructions || '[]'),
+                                category: ex.category ?? '',
+                                images: JSON.parse(ex.images || '[]'),
+                            } : null,
                         }))
                     );
                 }
@@ -134,8 +155,27 @@ export default function WorkoutFormScreen() {
         value: string
     ) => {
         const updated = [...exercises];
-        updated[index][field] = value;
+        updated[index][field] = value as any;
         setExercises(updated);
+    };
+
+    const handleExerciseNameChange = useCallback(async (index: number, value: string) => {
+        const updated = [...exercises];
+        updated[index] = { ...updated[index], exercise_name: value, dbMeta: null };
+        setExercises(updated);
+        if (value.trim().length < 2) {
+            setSuggestions((prev) => ({ ...prev, [index]: [] }));
+            return;
+        }
+        const results = await searchExercises(value, 7);
+        setSuggestions((prev) => ({ ...prev, [index]: results }));
+    }, [exercises]);
+
+    const selectSuggestion = (index: number, entry: ExerciseDbEntry) => {
+        const updated = [...exercises];
+        updated[index] = { ...updated[index], exercise_name: entry.name, dbMeta: entry };
+        setExercises(updated);
+        setSuggestions((prev) => ({ ...prev, [index]: [] }));
     };
 
     const handleSave = async () => {
@@ -170,7 +210,8 @@ export default function WorkoutFormScreen() {
           target_sets INTEGER NOT NULL,
           target_reps TEXT NOT NULL,
           rest_seconds INTEGER NOT NULL,
-          order_index INTEGER NOT NULL
+          order_index INTEGER NOT NULL,
+          image_url TEXT
         );
       `);
             let newGroupId = selectedGroupId;
@@ -208,11 +249,31 @@ export default function WorkoutFormScreen() {
                 const setsVal = parseInt(ex.target_sets, 10) || 3;
                 const restVal = parseInt(ex.rest_seconds, 10) || 60;
 
+                // Risolvi metadati: usa quelli già selezionati, altrimenti cerca
+                const meta = ex.dbMeta ?? await findExerciseMetadata(ex.exercise_name);
+                const imageUrl = meta?.images?.[0]
+                    ? `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${meta.images[0]}`
+                    : null;
+
                 await db.runAsync(
-                    `INSERT INTO workout_exercises 
-            (id, workout_id, exercise_name, target_sets, target_reps, rest_seconds, order_index) 
-           VALUES (?, ?, ?, ?, ?, ?, ?);`,
-                    [exId, currentWorkoutId, ex.exercise_name, setsVal, ex.target_reps || '10', restVal, i]
+                    `INSERT INTO workout_exercises
+                     (id, workout_id, exercise_name, equipment, target_sets, target_reps, rest_seconds, order_index,
+                      image_url, primary_muscles, secondary_muscles, force, mechanic, category, level, exercise_db_id,
+                      instructions, images)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+                    [
+                        exId, currentWorkoutId, ex.exercise_name, meta?.equipment ?? null, setsVal, ex.target_reps || '10', restVal, i,
+                        imageUrl,
+                        meta ? JSON.stringify(meta.primaryMuscles) : null,
+                        meta ? JSON.stringify(meta.secondaryMuscles) : null,
+                        meta?.force ?? null,
+                        meta?.mechanic ?? null,
+                        meta?.category ?? null,
+                        meta?.level ?? null,
+                        meta?.id ?? null,
+                        meta ? JSON.stringify(meta.instructions) : null,
+                        meta ? JSON.stringify(meta.images) : null,
+                    ]
                 );
             }
 
@@ -231,138 +292,180 @@ export default function WorkoutFormScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                <Text style={styles.headerTitle}>
-                    {workoutId ? '✏️ Modifica Scheda' : '➕ Nuova Scheda Manuale'}
-                </Text>
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
+                <ScrollView contentContainerStyle={styles.scrollContent}>
+                    <Text style={styles.headerTitle}>
+                        {workoutId ? '✏️ Modifica Scheda' : '➕ Nuova Scheda Manuale'}
+                    </Text>
 
-                {/* Campi Scheda */}
-                <Text style={styles.label}>Titolo Scheda *</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="Es. Petto e Bicipiti"
-                    value={title}
-                    onChangeText={setTitle}
-                />
+                    {/* Campi Scheda */}
+                    <Text style={styles.label}>Titolo Scheda *</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Es. Petto e Bicipiti"
+                        value={title}
+                        onChangeText={setTitle}
+                    />
 
-                <Text style={styles.label}>Descrizione / Note</Text>
-                <TextInput
-                    style={[styles.input, styles.multilineInput]}
-                    placeholder="Es. Focus ipertrofia, recuperi brevi"
-                    value={description}
-                    onChangeText={setDescription}
-                    multiline
-                />
+                    <Text style={styles.label}>Descrizione / Note</Text>
+                    <TextInput
+                        style={[styles.input, styles.multilineInput]}
+                        placeholder="Es. Focus ipertrofia, recuperi brevi"
+                        value={description}
+                        onChangeText={setDescription}
+                        multiline
+                    />
 
-                {/* Group Picker */}
-                {groups.length > 0 && (
-                    <>
-                        <Text style={styles.label}>Gruppo (opzionale)</Text>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            style={styles.groupScroll}
-                        >
-                            <TouchableOpacity
-                                style={[
-                                    styles.groupChip,
-                                    selectedGroupId === null && styles.groupChipSelected,
-                                ]}
-                                onPress={() => setSelectedGroupId(null)}
+                    {/* Group Picker */}
+                    {groups.length > 0 && (
+                        <>
+                            <Text style={styles.label}>Gruppo (opzionale)</Text>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                style={styles.groupScroll}
                             >
-                                <Text style={[
-                                    styles.groupChipText,
-                                    selectedGroupId === null && styles.groupChipTextSelected,
-                                ]}>Nessuno</Text>
-                            </TouchableOpacity>
-                            {groups.map((g) => (
                                 <TouchableOpacity
-                                    key={g.id}
                                     style={[
                                         styles.groupChip,
-                                        selectedGroupId === g.id && styles.groupChipSelected,
-                                        selectedGroupId === g.id && { backgroundColor: g.color, borderColor: g.color },
+                                        selectedGroupId === null && styles.groupChipSelected,
                                     ]}
-                                    onPress={() => setSelectedGroupId(g.id)}
+                                    onPress={() => setSelectedGroupId(null)}
                                 >
-                                    <View style={[styles.chipDot, { backgroundColor: selectedGroupId === g.id ? '#fff' : g.color }]} />
                                     <Text style={[
                                         styles.groupChipText,
-                                        selectedGroupId === g.id && styles.groupChipTextSelected,
-                                    ]}>{g.name}</Text>
+                                        selectedGroupId === null && styles.groupChipTextSelected,
+                                    ]}>Nessuno</Text>
                                 </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </>
-                )}
+                                {groups.map((g) => (
+                                    <TouchableOpacity
+                                        key={g.id}
+                                        style={[
+                                            styles.groupChip,
+                                            selectedGroupId === g.id && styles.groupChipSelected,
+                                            selectedGroupId === g.id && { backgroundColor: g.color, borderColor: g.color },
+                                        ]}
+                                        onPress={() => setSelectedGroupId(g.id)}
+                                    >
+                                        <View style={[styles.chipDot, { backgroundColor: selectedGroupId === g.id ? '#fff' : g.color }]} />
+                                        <Text style={[
+                                            styles.groupChipText,
+                                            selectedGroupId === g.id && styles.groupChipTextSelected,
+                                        ]}>{g.name}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </>
+                    )}
 
-                <View style={styles.divider} />
+                    <View style={styles.divider} />
 
-                <Text style={styles.sectionTitle}>Esercizi</Text>
+                    <Text style={styles.sectionTitle}>Esercizi</Text>
 
-                {exercises.map((ex, index) => (
-                    <View key={index} style={styles.exerciseCard}>
-                        <View style={styles.cardHeader}>
-                            <Text style={styles.exerciseIndexText}>Esercizio #{index + 1}</Text>
-                            <TouchableOpacity onPress={() => removeExercise(index)}>
-                                <Text style={styles.removeText}>🗑 Rimuovi</Text>
-                            </TouchableOpacity>
+                    {exercises.map((ex, index) => (
+                        <View key={index} style={styles.exerciseCard}>
+                            <View style={styles.cardHeader}>
+                                <Text style={styles.exerciseIndexText}>Esercizio #{index + 1}</Text>
+                                <TouchableOpacity onPress={() => removeExercise(index)}>
+                                    <Text style={styles.removeText}>🗑 Rimuovi</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Nome esercizio (Es. Bench Press)"
+                                value={ex.exercise_name}
+                                onChangeText={(val) => handleExerciseNameChange(index, val)}
+                                onBlur={() =>
+                                    setTimeout(() => setSuggestions((prev) => ({ ...prev, [index]: [] })), 200)
+                                }
+                            />
+
+                            {/* Autocomplete dropdown */}
+                            {suggestions[index] && suggestions[index].length > 0 && (
+                                <View style={styles.suggestionBox}>
+                                    {suggestions[index].map((s) => (
+                                        <TouchableOpacity
+                                            key={s.id}
+                                            style={styles.suggestionItem}
+                                            onPress={() => selectSuggestion(index, s)}
+                                        >
+                                            <Text style={styles.suggestionName}>{s.name}</Text>
+                                            <Text style={styles.suggestionMeta}>
+                                                {s.level} · {s.primaryMuscles.join(', ')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Show matched muscles if a DB entry is linked */}
+                            {ex.dbMeta && (
+                                <View style={styles.metaChips}>
+                                    {ex.dbMeta.primaryMuscles.map((m) => (
+                                        <View key={m} style={styles.chipPrimary}>
+                                            <Text style={styles.chipText}>{m}</Text>
+                                        </View>
+                                    ))}
+                                    {ex.dbMeta.secondaryMuscles.map((m) => (
+                                        <View key={m} style={styles.chipSecondary}>
+                                            <Text style={styles.chipText}>{m}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+
+                            <View style={styles.row}>
+                                <View style={styles.col}>
+                                    <Text style={styles.subLabel}>Serie</Text>
+                                    <TextInput
+                                        style={styles.inputSmall}
+                                        keyboardType="numeric"
+                                        value={ex.target_sets}
+                                        onChangeText={(val) => updateExerciseField(index, 'target_sets', val)}
+                                    />
+                                </View>
+
+                                <View style={styles.col}>
+                                    <Text style={styles.subLabel}>Reps Target</Text>
+                                    <TextInput
+                                        style={styles.inputSmall}
+                                        value={ex.target_reps}
+                                        onChangeText={(val) => updateExerciseField(index, 'target_reps', val)}
+                                    />
+                                </View>
+
+                                <View style={styles.col}>
+                                    <Text style={styles.subLabel}>Recupero (s)</Text>
+                                    <TextInput
+                                        style={styles.inputSmall}
+                                        keyboardType="numeric"
+                                        value={ex.rest_seconds}
+                                        onChangeText={(val) => updateExerciseField(index, 'rest_seconds', val)}
+                                    />
+                                </View>
+                            </View>
                         </View>
+                    ))}
 
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Nome esercizio (Es. Panca Piana)"
-                            value={ex.exercise_name}
-                            onChangeText={(val) => updateExerciseField(index, 'exercise_name', val)}
-                        />
+                    <TouchableOpacity style={styles.addBtn} onPress={addExercise}>
+                        <Text style={styles.addBtnText}>+ Aggiungi Esercizio</Text>
+                    </TouchableOpacity>
 
-                        <View style={styles.row}>
-                            <View style={styles.col}>
-                                <Text style={styles.subLabel}>Serie</Text>
-                                <TextInput
-                                    style={styles.inputSmall}
-                                    keyboardType="numeric"
-                                    value={ex.target_sets}
-                                    onChangeText={(val) => updateExerciseField(index, 'target_sets', val)}
-                                />
-                            </View>
-
-                            <View style={styles.col}>
-                                <Text style={styles.subLabel}>Reps Target</Text>
-                                <TextInput
-                                    style={styles.inputSmall}
-                                    value={ex.target_reps}
-                                    onChangeText={(val) => updateExerciseField(index, 'target_reps', val)}
-                                />
-                            </View>
-
-                            <View style={styles.col}>
-                                <Text style={styles.subLabel}>Recupero (s)</Text>
-                                <TextInput
-                                    style={styles.inputSmall}
-                                    keyboardType="numeric"
-                                    value={ex.rest_seconds}
-                                    onChangeText={(val) => updateExerciseField(index, 'rest_seconds', val)}
-                                />
-                            </View>
-                        </View>
-                    </View>
-                ))}
-
-                <TouchableOpacity style={styles.addBtn} onPress={addExercise}>
-                    <Text style={styles.addBtnText}>+ Aggiungi Esercizio</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.saveBtn, loading && { opacity: 0.7 }]}
-                    onPress={handleSave}
-                    disabled={loading}
-                >
-                    <Text style={styles.saveBtnText}>
-                        {loading ? 'Salvataggio...' : workoutId ? 'Salva Modifiche' : 'Crea Scheda'}
-                    </Text>
-                </TouchableOpacity>
-            </ScrollView>
+                    <TouchableOpacity
+                        style={[styles.saveBtn, loading && { opacity: 0.7 }]}
+                        onPress={handleSave}
+                        disabled={loading}
+                    >
+                        <Text style={styles.saveBtnText}>
+                            {loading ? 'Salvataggio...' : workoutId ? 'Salva Modifiche' : 'Crea Scheda'}
+                        </Text>
+                    </TouchableOpacity>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 };
@@ -427,6 +530,21 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     saveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+    suggestionBox: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#e5e5ea',
+        borderRadius: 8,
+        marginTop: -8,
+        marginBottom: 12,
+    },
+    suggestionItem: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+    suggestionName: { fontSize: 14, fontWeight: '600', color: '#1c1c1e' },
+    suggestionMeta: { fontSize: 12, color: '#666', marginTop: 2 },
+    metaChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+    chipPrimary: { backgroundColor: '#EAF2FF', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 4 },
+    chipSecondary: { backgroundColor: '#F1F3F5', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 4 },
+    chipText: { fontSize: 11, color: '#334155' },
     groupScroll: { marginBottom: 12 },
     groupChip: {
         flexDirection: 'row', alignItems: 'center',

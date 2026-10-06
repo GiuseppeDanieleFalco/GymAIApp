@@ -11,6 +11,9 @@ import {
     AppState,
     Vibration,
     Animated,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -19,6 +22,7 @@ import { getDb } from '../database/db';
 import notifee, { AndroidImportance, EventType, TriggerType } from '@notifee/react-native';
 import type { TimestampTrigger } from '@notifee/react-native';
 import { useActiveSessionStore, ExerciseItem } from '../store/activeSessionStore';
+import { findExerciseImageUrls, IMAGE_BASE_URL } from '../services/exerciseImageLookup';
 
 type RootStackParamList = {
     ActiveSession: { workoutId: string; workoutTitle: string };
@@ -32,6 +36,15 @@ interface SetInput {
     weightKg: string;
     completed: boolean;
 }
+
+const parseStringArray = (value: string | null | undefined): string[] => {
+    try {
+        const parsed: unknown = JSON.parse(value || '[]');
+        return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+    } catch {
+        return [];
+    }
+};
 
 export default function ActiveSessionScreen() {
     const route = useRoute<ActiveSessionRouteProp>();
@@ -159,6 +172,7 @@ export default function ActiveSessionScreen() {
                         style: 'destructive',
                         onPress: () => {
                             navigation.dispatch(e.data.action);
+                            activeSessionStore.clearSession();
                         },
                     },
                 ]
@@ -361,10 +375,17 @@ export default function ActiveSessionScreen() {
                 }
 
                 // 4. Mappa gli esercizi inserendo il peso dell'ultima sessione se presente
-                const mapped: ExerciseItem[] = rows.map((ex) => {
+                const mapped: ExerciseItem[] = await Promise.all(rows.map(async (ex) => {
                     const exerciseSetsLogs = lastSetLogs.filter(
                         (log) => log.exercise_id === ex.id
                     );
+
+                    // Cerca tutte le immagini reali nel free-exercise-db
+                    const imagePaths = parseStringArray(ex.images);
+                    const imageUrls = imagePaths.length > 0
+                        ? imagePaths.map((path) => `${IMAGE_BASE_URL}${path}`)
+                        : await findExerciseImageUrls(ex.exercise_name);
+                    if (imageUrls.length === 0 && ex.image_url) imageUrls.push(ex.image_url);
 
                     return {
                         id: ex.id,
@@ -372,6 +393,16 @@ export default function ActiveSessionScreen() {
                         target_sets: ex.target_sets || 3,
                         target_reps: ex.target_reps || '10',
                         rest_seconds: ex.rest_seconds || 60,
+                        image_url: imageUrls[0],
+                        image_urls: imageUrls,
+                        equipment: ex.equipment ?? null,
+                        primaryMuscles: parseStringArray(ex.primary_muscles),
+                        secondaryMuscles: parseStringArray(ex.secondary_muscles),
+                        instructions: parseStringArray(ex.instructions),
+                        force: ex.force ?? null,
+                        mechanic: ex.mechanic ?? null,
+                        category: ex.category ?? null,
+                        level: ex.level ?? null,
                         sets: Array.from({ length: ex.target_sets || 3 }, (_, i) => {
                             const setNum = i + 1;
                             // Trova il log della specifica serie dell'ultima volta
@@ -388,7 +419,7 @@ export default function ActiveSessionScreen() {
                             };
                         }),
                     };
-                });
+                }));
 
                 setExercises(mapped);
             } catch (error) {
@@ -489,7 +520,9 @@ export default function ActiveSessionScreen() {
                                     const setId = `set_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
                                     await db.runAsync(
-                                        `INSERT INTO set_logs (id, session_id, exercise_id, set_number, reps_completed, weight_kg) VALUES (?, ?, ?, ?, ?, ?);`,
+                                        `INSERT INTO set_logs
+                                         (id, session_id, exercise_id, set_number, reps_completed, weight_kg, completed, primary_muscles, secondary_muscles)
+                                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
                                         [
                                             setId,
                                             sessionId,
@@ -497,6 +530,9 @@ export default function ActiveSessionScreen() {
                                             s.setNumber || 1,
                                             repsVal,
                                             weightVal,
+                                            s.completed ? 1 : 0,
+                                            JSON.stringify(ex.primaryMuscles ?? []),
+                                            JSON.stringify(ex.secondaryMuscles ?? []),
                                         ]
                                     );
                                 }
@@ -526,107 +562,147 @@ export default function ActiveSessionScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Header con Timer Complessivo e Progress Bar Recupero */}
-            <View style={styles.header}>
-                <View style={styles.headerTop}>
-                    <View>
-                        <Text style={styles.title}>{workoutTitle}</Text>
-                        <Text style={styles.timerText}>
-                            ⏱ Tempo: {formatTime(elapsedSeconds)}
-                        </Text>
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
+                {/* Header con Timer Complessivo e Progress Bar Recupero */}
+                <View style={styles.header}>
+                    <View style={styles.headerTop}>
+                        <View>
+                            <Text style={styles.title}>{workoutTitle}</Text>
+                            <Text style={styles.timerText}>
+                                ⏱ Tempo: {formatTime(elapsedSeconds)}
+                            </Text>
+                        </View>
+                        {showRestBar && (
+                            <Animated.View style={[styles.restInfo, { opacity: barOpacity }]}>
+                                <Text style={styles.restLabel}>Recupero</Text>
+                                <Text style={styles.restTime}>{formatTime(restTimer || 0)}</Text>
+                            </Animated.View>
+                        )}
                     </View>
                     {showRestBar && (
-                        <Animated.View style={[styles.restInfo, { opacity: barOpacity }]}>
-                            <Text style={styles.restLabel}>Recupero</Text>
-                            <Text style={styles.restTime}>{formatTime(restTimer || 0)}</Text>
+                        <Animated.View style={[styles.restProgressTrack, { opacity: barOpacity }]}>
+                            <Animated.View
+                                style={[
+                                    styles.restProgressFill,
+                                    {
+                                        width: progressAnim.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: ['0%', '100%'],
+                                        }),
+                                        backgroundColor: completionAnim.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: ['#007AFF', '#34C759'],
+                                        }),
+                                    },
+                                ]}
+                            />
                         </Animated.View>
                     )}
                 </View>
-                {showRestBar && (
-                    <Animated.View style={[styles.restProgressTrack, { opacity: barOpacity }]}>
-                        <Animated.View
-                            style={[
-                                styles.restProgressFill,
-                                {
-                                    width: progressAnim.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: ['0%', '100%'],
-                                    }),
-                                    backgroundColor: completionAnim.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: ['#007AFF', '#34C759'],
-                                    }),
-                                },
-                            ]}
-                        />
-                    </Animated.View>
-                )}
-            </View>
 
-            <ScrollView style={styles.content}>
-                {exercises.map((ex, exIdx) => (
-                    <View key={ex.id} style={styles.exerciseCard}>
-                        <View style={styles.exerciseHeaderRow}>
-                            <Text style={styles.exerciseName}>{ex.exercise_name}</Text>
-                            <TouchableOpacity
-                                style={styles.videoBtn}
-                                onPress={() => setVideoSearchQuery(ex.exercise_name)}
-                            >
-                                <Text style={styles.videoBtnText}>▶ Video</Text>
-                            </TouchableOpacity>
-                        </View>
-                        <Text style={styles.exerciseInfo}>
-                            Target: {ex.target_sets} serie x {ex.target_reps} reps | Rest: {ex.rest_seconds}s
-                        </Text>
-
-                        {/* Intestazione Tabella Serie */}
-                        <View style={styles.tableHeader}>
-                            <Text style={[styles.colHeader, { width: 50 }]}>Serie</Text>
-                            <Text style={[styles.colHeader, { flex: 1 }]}>Kg</Text>
-                            <Text style={[styles.colHeader, { flex: 1 }]}>Reps</Text>
-                            <Text style={[styles.colHeader, { width: 60, textAlign: 'center' }]}>Fatto</Text>
-                        </View>
-
-                        {/* Righe Serie */}
-                        {ex.sets.map((s, setIdx) => (
-                            <View
-                                key={setIdx}
-                                style={[
-                                    styles.setRow,
-                                    s.completed && styles.setRowCompleted,
-                                ]}
-                            >
-                                <Text style={styles.setNumber}>#{s.setNumber}</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    keyboardType="numeric"
-                                    value={s.weightKg}
-                                    onChangeText={(val) => updateSetData(exIdx, setIdx, 'weightKg', val)}
-                                />
-                                <TextInput
-                                    style={styles.input}
-                                    keyboardType="numeric"
-                                    value={s.reps}
-                                    onChangeText={(val) => updateSetData(exIdx, setIdx, 'reps', val)}
-                                />
+                <ScrollView style={styles.content}>
+                    {exercises.map((ex, exIdx) => (
+                        <View key={ex.id} style={styles.exerciseCard}>
+                            <View style={styles.exerciseHeaderRow}>
+                                <Text style={styles.exerciseName}>{ex.exercise_name}</Text>
                                 <TouchableOpacity
-                                    style={[styles.checkBtn, s.completed && styles.checkBtnActive]}
-                                    onPress={() => toggleSetComplete(exIdx, setIdx)}
+                                    style={styles.videoBtn}
+                                    onPress={() => setVideoSearchQuery(ex.exercise_name)}
                                 >
-                                    <Text style={styles.checkBtnText}>{s.completed ? '✓' : ''}</Text>
+                                    <Text style={styles.videoBtnText}>▶ Video</Text>
                                 </TouchableOpacity>
                             </View>
-                        ))}
-                    </View>
-                ))}
-            </ScrollView>
+                            <Text style={styles.exerciseInfo}>
+                                Target: {ex.target_sets} serie x {ex.target_reps} reps | Rest: {ex.rest_seconds}s
+                            </Text>
 
-            {/* Pulsante di fine sessione */}
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.finishButton} onPress={handleFinishWorkout}>
-                    <Text style={styles.finishButtonText}>Termina e Salva Allenamento</Text>
-                </TouchableOpacity>
-            </View>
+                            {/* Immagini esercizio: start + end position affiancate */}
+                            {ex.image_urls && ex.image_urls.length > 0 ? (
+                                <View style={styles.exerciseImagesRow}>
+                                    {ex.image_urls.map((url, imgIdx) => (
+                                        <Image
+                                            key={imgIdx}
+                                            source={{ uri: url }}
+                                            style={[
+                                                styles.exerciseImageThumb,
+                                                ex.image_urls!.length === 1 && styles.exerciseImageFull,
+                                            ]}
+                                            resizeMode="contain"
+                                        />
+                                    ))}
+                                </View>
+                            ) : null}
+
+                            {(ex.primaryMuscles?.length || ex.secondaryMuscles?.length) ? (
+                                <Text style={styles.exerciseInfo}>
+                                    Muscoli principali: {ex.primaryMuscles?.join(', ') || 'Nessuno'}
+                                    {ex.secondaryMuscles?.length ? ` | Secondari: ${ex.secondaryMuscles.join(', ')}` : ''}
+                                </Text>
+                            ) : null}
+
+                            {ex.instructions && ex.instructions.length > 0 && (
+                                <View style={styles.instructionsBlock}>
+                                    <Text style={styles.instructionsTitle}>Istruzioni</Text>
+                                    {ex.instructions.map((instruction, index) => (
+                                        <Text key={`${ex.id}-instruction-${index}`} style={styles.instructionText}>
+                                            {index + 1}. {instruction}
+                                        </Text>
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Intestazione Tabella Serie */}
+                            <View style={styles.tableHeader}>
+                                <Text style={[styles.colHeader, { width: 50 }]}>Serie</Text>
+                                <Text style={[styles.colHeader, { flex: 1 }]}>Kg</Text>
+                                <Text style={[styles.colHeader, { flex: 1 }]}>Reps</Text>
+                                <Text style={[styles.colHeader, { width: 60, textAlign: 'center' }]}>Fatto</Text>
+                            </View>
+
+                            {/* Righe Serie */}
+                            {ex.sets.map((s, setIdx) => (
+                                <View
+                                    key={setIdx}
+                                    style={[
+                                        styles.setRow,
+                                        s.completed && styles.setRowCompleted,
+                                    ]}
+                                >
+                                    <Text style={styles.setNumber}>#{s.setNumber}</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        keyboardType="numeric"
+                                        value={s.weightKg}
+                                        onChangeText={(val) => updateSetData(exIdx, setIdx, 'weightKg', val)}
+                                    />
+                                    <TextInput
+                                        style={styles.input}
+                                        keyboardType="numeric"
+                                        value={s.reps}
+                                        onChangeText={(val) => updateSetData(exIdx, setIdx, 'reps', val)}
+                                    />
+                                    <TouchableOpacity
+                                        style={[styles.checkBtn, s.completed && styles.checkBtnActive]}
+                                        onPress={() => toggleSetComplete(exIdx, setIdx)}
+                                    >
+                                        <Text style={styles.checkBtnText}>{s.completed ? '✓' : ''}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                        </View>
+                    ))}
+                </ScrollView>
+
+                {/* Pulsante di fine sessione */}
+                <View style={styles.footer}>
+                    <TouchableOpacity style={styles.finishButton} onPress={handleFinishWorkout}>
+                        <Text style={styles.finishButtonText}>Termina e Salva Allenamento</Text>
+                    </TouchableOpacity>
+                </View>
+            </KeyboardAvoidingView>
 
             {/* Modale Timer Recupero Full Screen */}
             <Modal
@@ -748,7 +824,31 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: 'bold',
     },
+    exerciseImage: {
+        width: '100%',
+        height: 200,
+        borderRadius: 8,
+        marginBottom: 12,
+        backgroundColor: '#f9f9f9',
+    },
+    exerciseImagesRow: {
+        flexDirection: 'row',
+        gap: 6,
+        marginBottom: 12,
+    },
+    exerciseImageThumb: {
+        flex: 1,
+        height: 160,
+        borderRadius: 8,
+        backgroundColor: '#f0f0f0',
+    },
+    exerciseImageFull: {
+        height: 200,
+    },
     exerciseInfo: { fontSize: 12, color: '#7f8c8d', marginBottom: 12 },
+    instructionsBlock: { marginBottom: 12 },
+    instructionsTitle: { fontSize: 13, fontWeight: '700', color: '#2c3e50', marginBottom: 4 },
+    instructionText: { fontSize: 12, color: '#555', lineHeight: 18, marginBottom: 3 },
     tableHeader: {
         flexDirection: 'row',
         borderBottomWidth: 1,

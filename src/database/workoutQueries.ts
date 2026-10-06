@@ -16,11 +16,20 @@ export interface WorkoutExerciseItem {
     id: string;
     workout_id: string;
     exercise_name: string;
-    equipment: string;
+    equipment: string | null;
     target_sets: number;
     target_reps: string;
     rest_seconds: number;
     order_index: number;
+    primary_muscles?: string | null;
+    secondary_muscles?: string | null;
+    force?: string | null;
+    mechanic?: string | null;
+    category?: string | null;
+    level?: string | null;
+    exercise_db_id?: string | null;
+    instructions?: string | null;
+    images?: string | null;
 }
 
 // Recupera tutte le schede con il conteggio degli esercizi e i dati del gruppo

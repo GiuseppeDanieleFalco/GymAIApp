@@ -21,6 +21,7 @@ export interface AIGeneratedExercise {
     rest_seconds: number;
     rpe_suggested?: number;
     execution_notes?: string;
+    image_url?: string;
 }
 
 export interface AIGeneratedDay {

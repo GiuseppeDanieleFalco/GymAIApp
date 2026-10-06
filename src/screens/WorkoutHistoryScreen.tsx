@@ -22,8 +22,24 @@ interface HistorySession {
         reps_completed: number;
         weight_kg: number;
         exercise_id: string;
+        completed: number;
     }[];
 }
+
+interface MuscleUseSummary {
+    muscle: string;
+    primarySets: number;
+    secondarySets: number;
+}
+
+const parseMuscles = (value: string | null): string[] => {
+    try {
+        const parsed: unknown = JSON.parse(value || '[]');
+        return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+    } catch {
+        return [];
+    }
+};
 
 const formatDate = (isoString: string) => {
     if (!isoString) return '';
@@ -74,6 +90,7 @@ const HistoryItem = ({ item, navigation, onDelete }: { item: HistorySession, nav
                             </Text>
                             <Text style={styles.logDetails}>
                                 Set #{log.set_number}: <Text style={styles.bold}>{log.weight_kg} kg</Text> x {log.reps_completed} reps
+                                {log.completed ? '' : ' · Parziale'}
                             </Text>
                         </TouchableOpacity>
                     ))}
@@ -85,6 +102,7 @@ const HistoryItem = ({ item, navigation, onDelete }: { item: HistorySession, nav
 
 export default function WorkoutHistoryScreen({ navigation }: any) {
     const [history, setHistory] = useState<HistorySession[]>([]);
+    const [muscleStats, setMuscleStats] = useState<MuscleUseSummary[]>([]);
     const [loading, setLoading] = useState(true);
 
     const fetchHistory = async () => {
@@ -118,12 +136,39 @@ export default function WorkoutHistoryScreen({ navigation }: any) {
         ORDER BY wl.completed_at DESC;
       `);
 
+            const completedSetMuscles = await db.getAllAsync<{
+                primary_muscles: string | null;
+                secondary_muscles: string | null;
+            }>(`
+                SELECT primary_muscles, secondary_muscles
+                FROM set_logs
+                WHERE completed = 1;
+            `);
+            const muscleSummary = new Map<string, MuscleUseSummary>();
+            for (const row of completedSetMuscles) {
+                const primary = new Set(parseMuscles(row.primary_muscles));
+                const secondary = new Set(parseMuscles(row.secondary_muscles));
+                for (const muscle of primary) {
+                    const summary = muscleSummary.get(muscle) ?? { muscle, primarySets: 0, secondarySets: 0 };
+                    summary.primarySets += 1;
+                    muscleSummary.set(muscle, summary);
+                }
+                for (const muscle of secondary) {
+                    const summary = muscleSummary.get(muscle) ?? { muscle, primarySets: 0, secondarySets: 0 };
+                    summary.secondarySets += 1;
+                    muscleSummary.set(muscle, summary);
+                }
+            }
+            setMuscleStats([...muscleSummary.values()].sort(
+                (a, b) => b.primarySets - a.primarySets || b.secondarySets - a.secondarySets
+            ));
+
             const fullHistory: HistorySession[] = [];
 
             for (const s of sessions) {
                 // Per ogni sessione recupera i dettagli delle serie e il nome dell'esercizio
                 const setLogs: any[] = await db.getAllAsync(`
-          SELECT sl.set_number, sl.reps_completed, sl.weight_kg, we.exercise_name, we.id AS exercise_id
+          SELECT sl.set_number, sl.reps_completed, sl.weight_kg, sl.completed, we.exercise_name, we.id AS exercise_id
           FROM set_logs sl
           LEFT JOIN workout_exercises we ON sl.exercise_id = we.id
           WHERE sl.session_id = ?
@@ -199,6 +244,22 @@ export default function WorkoutHistoryScreen({ navigation }: any) {
                     data={history}
                     keyExtractor={(item) => item.id}
                     contentContainerStyle={{ paddingBottom: 20 }}
+                    ListHeaderComponent={muscleStats.length > 0 ? (
+                        <View style={styles.muscleSummary}>
+                            <Text style={styles.muscleSummaryTitle}>Serie completate per muscolo</Text>
+                            {muscleStats.map((item) => (
+                                <View key={item.muscle} style={styles.muscleSummaryRow}>
+                                    <Text style={styles.muscleName}>{item.muscle}</Text>
+                                    <Text style={styles.muscleCounts}>
+                                        Principali {item.primarySets} · Secondari {item.secondarySets}
+                                    </Text>
+                                </View>
+                            ))}
+                            <Text style={styles.muscleSummaryNote}>
+                                I conteggi indicano i muscoli associati agli esercizi, non misure di attivazione.
+                            </Text>
+                        </View>
+                    ) : null}
                     renderItem={({ item }) => (
                         <HistoryItem item={item} navigation={navigation} onDelete={deleteSession} />
                     )}
@@ -240,4 +301,15 @@ const styles = StyleSheet.create({
     exerciseName: { fontSize: 13, color: '#333', flex: 1 },
     logDetails: { fontSize: 13, color: '#555' },
     bold: { fontWeight: 'bold', color: '#1c1c1e' },
+    muscleSummary: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 14,
+        marginBottom: 14,
+    },
+    muscleSummaryTitle: { fontSize: 15, fontWeight: '700', color: '#1c1c1e', marginBottom: 8 },
+    muscleSummaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 },
+    muscleName: { fontSize: 13, fontWeight: '600', color: '#333', textTransform: 'capitalize' },
+    muscleCounts: { fontSize: 12, color: '#555' },
+    muscleSummaryNote: { fontSize: 11, color: '#8e8e93', marginTop: 8, lineHeight: 15 },
 });

@@ -41,6 +41,16 @@ export const initDatabase = async () => {
       target_reps TEXT,
       rest_seconds INTEGER,
       order_index INTEGER,
+      image_url TEXT,
+      primary_muscles TEXT,
+      secondary_muscles TEXT,
+      force TEXT,
+      mechanic TEXT,
+      category TEXT,
+      level TEXT,
+      exercise_db_id TEXT,
+      instructions TEXT,
+      images TEXT,
       FOREIGN KEY(workout_id) REFERENCES workouts(id) ON DELETE CASCADE
     );
 
@@ -57,7 +67,10 @@ export const initDatabase = async () => {
       exercise_id TEXT NOT NULL,
       set_number INTEGER NOT NULL,
       reps_completed INTEGER NOT NULL,
-      weight_kg REAL NOT NULL
+      weight_kg REAL NOT NULL,
+      completed INTEGER NOT NULL DEFAULT 0,
+      primary_muscles TEXT,
+      secondary_muscles TEXT
     );
 
     CREATE TABLE IF NOT EXISTS exercises (
@@ -85,6 +98,68 @@ export const initDatabase = async () => {
       // La colonna esiste già (installazione nuova) — ignorabile
     }
     await db.runAsync('PRAGMA user_version = 1;');
+  }
+
+  // Migrazione v2: aggiunge image_url a workout_exercises
+  if (dbVersion < 2) {
+    try {
+      await db.execAsync(
+        `ALTER TABLE workout_exercises ADD COLUMN image_url TEXT;`
+      );
+    } catch {
+      // La colonna esiste già
+    }
+    await db.runAsync('PRAGMA user_version = 2;');
+  }
+
+  // Migrazione v3: aggiunge colonne metadati esercizio (muscoli, forza, categoria, livello)
+  if (dbVersion < 3) {
+    const metaCols = [
+      'primary_muscles TEXT',
+      'secondary_muscles TEXT',
+      'force TEXT',
+      'mechanic TEXT',
+      'category TEXT',
+      'level TEXT',
+      'exercise_db_id TEXT',
+    ];
+    for (const col of metaCols) {
+      const [colName] = col.split(' ');
+      try {
+        await db.execAsync(`ALTER TABLE workout_exercises ADD COLUMN ${col};`);
+      } catch {
+        // colonna già presente
+      }
+    }
+    await db.runAsync('PRAGMA user_version = 3;');
+  }
+
+  // Migrazione v4: salva istruzioni e tutte le immagini del catalogo
+  if (dbVersion < 4) {
+    for (const col of ['instructions TEXT', 'images TEXT']) {
+      try {
+        await db.execAsync(`ALTER TABLE workout_exercises ADD COLUMN ${col};`);
+      } catch {
+        // colonna già presente
+      }
+    }
+    await db.runAsync('PRAGMA user_version = 4;');
+  }
+
+  // Migrazione v5: distingue i set completati e conserva i muscoli al momento dell'allenamento
+  if (dbVersion < 5) {
+    for (const col of [
+      'completed INTEGER NOT NULL DEFAULT 0',
+      'primary_muscles TEXT',
+      'secondary_muscles TEXT',
+    ]) {
+      try {
+        await db.execAsync(`ALTER TABLE set_logs ADD COLUMN ${col};`);
+      } catch {
+        // colonna già presente
+      }
+    }
+    await db.runAsync('PRAGMA user_version = 5;');
   }
 };
 

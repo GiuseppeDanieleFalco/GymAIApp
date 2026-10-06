@@ -15,6 +15,55 @@ import { Ionicons } from '@expo/vector-icons';
 import { getWorkoutDetails, WorkoutItem, WorkoutExerciseItem } from '../database/workoutQueries';
 import { getDb } from '../database/db';
 
+const parseStringArray = (value: string | null | undefined): string[] => {
+    try {
+        const parsed: unknown = JSON.parse(value || '[]');
+        return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+    } catch {
+        return [];
+    }
+};
+
+const ExerciseMetadata = ({ exercise }: { exercise: WorkoutExerciseItem }) => {
+    const primaryMuscles = parseStringArray(exercise.primary_muscles);
+    const secondaryMuscles = parseStringArray(exercise.secondary_muscles);
+    const instructions = parseStringArray(exercise.instructions);
+    const characteristics = [
+        exercise.category,
+        exercise.level,
+        exercise.force,
+        exercise.mechanic,
+    ].filter(Boolean);
+
+    if (!primaryMuscles.length && !secondaryMuscles.length && !instructions.length && !characteristics.length) {
+        return null;
+    }
+
+    return (
+        <View style={styles.exerciseMetadata}>
+            {primaryMuscles.length > 0 && (
+                <Text style={styles.metadataText}>Muscoli principali: {primaryMuscles.join(', ')}</Text>
+            )}
+            {secondaryMuscles.length > 0 && (
+                <Text style={styles.metadataText}>Muscoli secondari: {secondaryMuscles.join(', ')}</Text>
+            )}
+            {characteristics.length > 0 && (
+                <Text style={styles.metadataText}>{characteristics.join(' · ')}</Text>
+            )}
+            {instructions.length > 0 && (
+                <View style={styles.instructionsBlock}>
+                    <Text style={styles.instructionsTitle}>Istruzioni</Text>
+                    {instructions.map((instruction, index) => (
+                        <Text key={`${exercise.id}-instruction-${index}`} style={styles.instructionText}>
+                            {index + 1}. {instruction}
+                        </Text>
+                    ))}
+                </View>
+            )}
+        </View>
+    );
+};
+
 export default function WorkoutDetailScreen({ route, navigation }: any) {
     const { workoutId } = route.params;
     const [workout, setWorkout] = useState<WorkoutItem | null>(null);
@@ -136,7 +185,7 @@ export default function WorkoutDetailScreen({ route, navigation }: any) {
                                 <Text style={styles.equipmentText}>Attrezzo: {ex.equipment || 'Libero'}</Text>
                             </View>
                             <View style={styles.exerciseActions}>
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     style={styles.videoBtn}
                                     onPress={() => setVideoSearchQuery(ex.exercise_name)}
                                 >
@@ -171,6 +220,7 @@ export default function WorkoutDetailScreen({ route, navigation }: any) {
                                 <Text style={styles.statValue}>{ex.rest_seconds}s</Text>
                             </View>
                         </View>
+                        <ExerciseMetadata exercise={ex} />
                     </View>
                 ))}
             </ScrollView>
@@ -270,6 +320,11 @@ const styles = StyleSheet.create({
     statBox: { alignItems: 'center' },
     statLabel: { fontSize: 11, color: '#64748B' },
     statValue: { fontSize: 14, fontWeight: 'bold', color: '#0F172A', marginTop: 2 },
+    exerciseMetadata: { marginTop: 10, gap: 4 },
+    metadataText: { fontSize: 12, color: '#475569', lineHeight: 17 },
+    instructionsBlock: { marginTop: 4 },
+    instructionsTitle: { fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
+    instructionText: { fontSize: 12, color: '#475569', lineHeight: 18, marginBottom: 3 },
     footerBar: {
         position: 'absolute',
         bottom: 0,
