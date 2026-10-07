@@ -379,19 +379,29 @@ export default function WorkoutFormScreen() {
                                 placeholder="Nome esercizio (Es. Bench Press)"
                                 value={ex.exercise_name}
                                 onChangeText={(val) => handleExerciseNameChange(index, val)}
-                                onBlur={() =>
-                                    setTimeout(() => setSuggestions((prev) => ({ ...prev, [index]: [] })), 200)
-                                }
+                            // onBlur={() => setSuggestions((prev) => ({ ...prev, [index]: [] }))}
                             />
 
                             {/* Autocomplete dropdown */}
                             {suggestions[index] && suggestions[index].length > 0 && (
                                 <View style={styles.suggestionBox}>
+                                    {/* Header with Close Button */}
+                                    <View style={styles.suggestionHeader}>
+                                        <Text style={styles.suggestionHeaderTitle}>Suggerimenti</Text>
+                                        <TouchableOpacity
+                                            onPressIn={() => setSuggestions((prev) => ({ ...prev, [index]: [] }))}
+                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        >
+                                            <Text style={styles.closeButtonText}>✕</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* Suggestion Items */}
                                     {suggestions[index].map((s) => (
                                         <TouchableOpacity
                                             key={s.id}
                                             style={styles.suggestionItem}
-                                            onPress={() => selectSuggestion(index, s)}
+                                            onPressIn={() => selectSuggestion(index, s)}
                                         >
                                             <Text style={styles.suggestionName}>{s.name}</Text>
                                             <Text style={styles.suggestionMeta}>
@@ -541,6 +551,26 @@ const styles = StyleSheet.create({
     suggestionItem: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
     suggestionName: { fontSize: 14, fontWeight: '600', color: '#1c1c1e' },
     suggestionMeta: { fontSize: 12, color: '#666', marginTop: 2 },
+    suggestionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee', // adjust to your theme
+    },
+    suggestionHeaderTitle: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#888',
+    },
+    closeButtonText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#666',
+        paddingHorizontal: 4,
+    },
     metaChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
     chipPrimary: { backgroundColor: '#EAF2FF', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 4 },
     chipSecondary: { backgroundColor: '#F1F3F5', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 4 },
