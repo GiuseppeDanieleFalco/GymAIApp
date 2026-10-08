@@ -380,7 +380,7 @@ export default function WorkoutFormScreen() {
                                 value={ex.exercise_name}
                                 onChangeText={(val) => handleExerciseNameChange(index, val)}
                             // onBlur={() => setSuggestions((prev) => ({ ...prev, [index]: [] }))}
-                            />
+                            />\
 
                             {/* Autocomplete dropdown */}
                             {suggestions[index] && suggestions[index].length > 0 && (

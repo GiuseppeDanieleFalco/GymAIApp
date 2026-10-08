@@ -59,6 +59,8 @@ export default function ActiveSessionScreen() {
     const [restTimer, setRestTimer] = useState<number | null>(null);
     const [isRestModalVisible, setIsRestModalVisible] = useState(false);
     const [videoSearchQuery, setVideoSearchQuery] = useState<string | null>(null);
+    const [expandedInstructions, setExpandedInstructions] = useState<Record<string, boolean>>({});
+
     const isFinishing = useRef(false);
 
     const appState = useRef(AppState.currentState);
@@ -563,18 +565,23 @@ export default function ActiveSessionScreen() {
     const totalPlannedSets = exercises.reduce((total, ex) => total + ex.sets.length, 0);
     const completedSetsCount = exercises.reduce((total, ex) => total + ex.sets.filter((s) => s.completed).length, 0);
 
+    // Function to toggle instructions per exercise:
+    const toggleInstructions = (id: string) => {
+        setExpandedInstructions((prev) => ({ ...prev, [id]: !prev[id] }));
+    };
+
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            >
-                <View style={styles.header}>
+            ><View style={styles.header}>
                     <View style={styles.headerTop}>
                         <View style={styles.titleWrap}>
                             <Text style={styles.kicker}>Workout</Text>
-                            <Text style={styles.title}>{workoutTitle}</Text>
+                            <Text style={styles.title} numberOfLines={1}>{workoutTitle}</Text>
                         </View>
+
                         {showRestBar && (
                             <Animated.View style={[styles.restInfo, { opacity: barOpacity }]}>
                                 <Text style={styles.restLabel}>Recupero</Text>
@@ -627,26 +634,91 @@ export default function ActiveSessionScreen() {
                                     completedThisExercise === ex.sets.length && styles.exerciseCardCompleted,
                                 ]}
                             >
+                                {/* Header Row */}
                                 <View style={styles.exerciseHeaderRow}>
                                     <View style={styles.exerciseTitleWrap}>
-                                        <Text style={styles.exerciseIndex}>E{exIdx + 1}</Text>
-                                        <Text style={styles.exerciseName}>{ex.exercise_name}</Text>
+                                        <View style={styles.exerciseIndexBadge}>
+                                            <Text style={styles.exerciseIndex}>E{exIdx + 1}</Text>
+                                        </View>
+                                        <Text style={styles.exerciseName} numberOfLines={2}>
+                                            {ex.exercise_name}
+                                        </Text>
+
+                                        {/* Instructions / Info Toggle Button */}
+                                        {(ex.instructions?.length || ex.primaryMuscles?.length) ? (
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.infoBtn,
+                                                    expandedInstructions[ex.id] && styles.infoBtnActive,
+                                                ]}
+                                                onPress={() => toggleInstructions(ex.id)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text
+                                                    style={[
+                                                        styles.infoBtnText,
+                                                        expandedInstructions[ex.id] && styles.infoBtnTextActive,
+                                                    ]}
+                                                >
+                                                    ?
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ) : null}
                                     </View>
+
                                     <TouchableOpacity
                                         style={styles.videoBtn}
                                         onPress={() => setVideoSearchQuery(ex.exercise_name)}
+                                        activeOpacity={0.7}
                                     >
                                         <Text style={styles.videoBtnText}>▶ Video</Text>
                                     </TouchableOpacity>
                                 </View>
 
+                                {/* Collapsible Info & Instructions Box */}
+                                {expandedInstructions[ex.id] && (
+                                    <View style={styles.infoDropdownBlock}>
+                                        {/* Muscle Groups */}
+                                        {(ex.primaryMuscles?.length || ex.secondaryMuscles?.length) ? (
+                                            <View style={styles.muscleContainer}>
+                                                <Text style={styles.muscleText}>
+                                                    <Text style={styles.muscleLabel}>Muscoli: </Text>
+                                                    {ex.primaryMuscles?.join(', ') || 'Nessuno'}
+                                                    {ex.secondaryMuscles?.length ? ` · ${ex.secondaryMuscles.join(', ')}` : ''}
+                                                </Text>
+                                            </View>
+                                        ) : null}
+
+                                        {/* Instructions */}
+                                        {ex.instructions && ex.instructions.length > 0 && (
+                                            <View style={styles.instructionsBlock}>
+                                                <Text style={styles.instructionsTitle}>Istruzioni</Text>
+                                                {ex.instructions.map((instruction, index) => (
+                                                    <Text key={`${ex.id}-instruction-${index}`} style={styles.instructionText}>
+                                                        <Text style={styles.stepNumber}>{index + 1}. </Text>
+                                                        {instruction}
+                                                    </Text>
+                                                ))}
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
+
+                                {/* Target Meta Pills */}
                                 <View style={styles.exerciseMetaRow}>
-                                    <Text style={styles.metaPill}>{ex.target_sets} set</Text>
-                                    <Text style={styles.metaPill}>{ex.target_reps} reps</Text>
-                                    <Text style={styles.metaPill}>{ex.rest_seconds}s rest</Text>
+                                    <View style={styles.metaPill}>
+                                        <Text style={styles.metaPillText}>{ex.target_sets} set</Text>
+                                    </View>
+                                    <View style={styles.metaPill}>
+                                        <Text style={styles.metaPillText}>{ex.target_reps} reps</Text>
+                                    </View>
+                                    <View style={styles.metaPill}>
+                                        <Text style={styles.metaPillText}>{ex.rest_seconds}s rest</Text>
+                                    </View>
                                 </View>
 
-                                {ex.image_urls && ex.image_urls.length > 0 ? (
+                                {/* Thumbnails */}
+                                {ex.image_urls && ex.image_urls.length > 0 && (
                                     <View style={styles.exerciseImagesRow}>
                                         {ex.image_urls.map((url, imgIdx) => (
                                             <Image
@@ -656,37 +728,21 @@ export default function ActiveSessionScreen() {
                                                     styles.exerciseImageThumb,
                                                     ex.image_urls!.length === 1 && styles.exerciseImageFull,
                                                 ]}
-                                                resizeMode="contain"
+                                                resizeMode="cover"
                                             />
-                                        ))}
-                                    </View>
-                                ) : null}
-
-                                {(ex.primaryMuscles?.length || ex.secondaryMuscles?.length) ? (
-                                    <Text style={styles.exerciseInfo}>
-                                        Muscoli principali: {ex.primaryMuscles?.join(', ') || 'Nessuno'}
-                                        {ex.secondaryMuscles?.length ? ` · Secondari: ${ex.secondaryMuscles.join(', ')}` : ''}
-                                    </Text>
-                                ) : null}
-
-                                {ex.instructions && ex.instructions.length > 0 && (
-                                    <View style={styles.instructionsBlock}>
-                                        <Text style={styles.instructionsTitle}>Istruzioni</Text>
-                                        {ex.instructions.map((instruction, index) => (
-                                            <Text key={`${ex.id}-instruction-${index}`} style={styles.instructionText}>
-                                                {index + 1}. {instruction}
-                                            </Text>
                                         ))}
                                     </View>
                                 )}
 
+                                {/* Sets Table Header */}
                                 <View style={styles.tableHeader}>
-                                    <Text style={[styles.colHeader, { width: 38 }]}>#</Text>
-                                    <Text style={[styles.colHeader, { flex: 1 }]}>Kg</Text>
-                                    <Text style={[styles.colHeader, { flex: 1 }]}>Reps</Text>
-                                    <Text style={[styles.colHeader, { width: 42, textAlign: 'center' }]}>✓</Text>
+                                    <Text style={[styles.colHeader, { width: 36, textAlign: 'center' }]}>SET</Text>
+                                    <Text style={[styles.colHeader, { flex: 1 }]}>KG</Text>
+                                    <Text style={[styles.colHeader, { flex: 1 }]}>REPS</Text>
+                                    <Text style={[styles.colHeader, { width: 48, textAlign: 'center' }]}>STATUS</Text>
                                 </View>
 
+                                {/* Set Rows */}
                                 {ex.sets.map((s, setIdx) => (
                                     <View
                                         key={setIdx}
@@ -697,20 +753,20 @@ export default function ActiveSessionScreen() {
                                     >
                                         <Text style={styles.setNumber}>{s.setNumber}</Text>
                                         <TextInput
-                                            style={styles.input}
+                                            style={[styles.input, s.completed && styles.inputCompleted]}
                                             keyboardType="numeric"
                                             value={s.weightKg}
                                             onChangeText={(val) => updateSetData(exIdx, setIdx, 'weightKg', val)}
                                             placeholder="0"
-                                            placeholderTextColor="#9aa3af"
+                                            placeholderTextColor="#94a3b8"
                                         />
                                         <TextInput
-                                            style={styles.input}
+                                            style={[styles.input, s.completed && styles.inputCompleted]}
                                             keyboardType="numeric"
                                             value={s.reps}
                                             onChangeText={(val) => updateSetData(exIdx, setIdx, 'reps', val)}
                                             placeholder="0"
-                                            placeholderTextColor="#9aa3af"
+                                            placeholderTextColor="#94a3b8"
                                         />
                                         <TouchableOpacity
                                             style={[styles.checkBtn, s.completed && styles.checkBtnActive]}
@@ -733,7 +789,6 @@ export default function ActiveSessionScreen() {
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
-
             <Modal
                 visible={isRestModalVisible}
                 animationType="slide"
@@ -741,30 +796,45 @@ export default function ActiveSessionScreen() {
                 onRequestClose={() => setIsRestModalVisible(false)}
             >
                 <View style={styles.restModalContainer}>
-                    <Text style={styles.restModalTitle}>Recupero</Text>
-                    <Text style={styles.restModalTime}>{formatTime(restTimer || 0)}</Text>
+                    {/* PageSheet Handle Indicator */}
+                    <View style={styles.dragHandle} />
 
+                    {/* Header */}
+                    <Text style={styles.restModalKicker}>Pausa in corso</Text>
+                    <Text style={styles.restModalTitle}>Recupero</Text>
+
+                    {/* Circular/Pill Hero Countdown Display */}
+                    <View style={styles.timerCircle}>
+                        <Text style={styles.restModalTime}>{formatTime(restTimer || 0)}</Text>
+                        <Text style={styles.timerSubtext}>rimanenti</Text>
+                    </View>
+
+                    {/* Primary Action Row */}
                     <View style={styles.restModalActions}>
                         <TouchableOpacity
-                            style={styles.restModalButton}
+                            style={[styles.restModalButton, styles.buttonAdd]}
                             onPress={add30s}
+                            activeOpacity={0.8}
                         >
-                            <Text style={styles.restModalButtonText}>+30s</Text>
+                            <Text style={styles.buttonAddText}>+30s</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.restModalButton, styles.restModalButtonSkip]}
+                            style={[styles.restModalButton, styles.buttonSkip]}
                             onPress={jumpTimer}
+                            activeOpacity={0.8}
                         >
-                            <Text style={styles.restModalButtonText}>Salta</Text>
+                            <Text style={styles.buttonSkipText}>Salta ➔</Text>
                         </TouchableOpacity>
                     </View>
 
+                    {/* Minimize / Background Action */}
                     <TouchableOpacity
                         style={styles.restModalCloseBtn}
                         onPress={() => setIsRestModalVisible(false)}
+                        activeOpacity={0.7}
                     >
-                        <Text style={styles.restModalCloseText}>Riduci in background</Text>
+                        <Text style={styles.restModalCloseText}>↓ Riduci in background</Text>
                     </TouchableOpacity>
                 </View>
             </Modal>
@@ -800,100 +870,106 @@ const styles = StyleSheet.create({
         backgroundColor: '#eef4ff',
     },
     header: {
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 10,
-        backgroundColor: '#f8fafc',
-        borderBottomLeftRadius: 18,
-        borderBottomRightRadius: 18,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 16,
+        backgroundColor: '#ffffff',
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
         shadowColor: '#0f172a',
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 2,
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 3,
     },
     headerTop: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 10,
+        alignItems: 'center',
+        marginBottom: 16,
     },
     titleWrap: {
         flex: 1,
         paddingRight: 12,
     },
     kicker: {
-        color: '#64748b',
+        color: '#6366f1',
         fontSize: 11,
-        fontWeight: '700',
-        letterSpacing: 1.2,
+        fontWeight: '800',
+        letterSpacing: 1.1,
         textTransform: 'uppercase',
-        marginBottom: 6,
+        marginBottom: 2,
     },
     title: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: '800',
         color: '#0f172a',
-        letterSpacing: -0.2,
+        letterSpacing: -0.4,
     },
     summaryRow: {
         flexDirection: 'row',
-        gap: 8,
-        marginBottom: 8,
+        gap: 10,
     },
     metricPill: {
         flex: 1,
-        backgroundColor: '#f1f5f9',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
         borderWidth: 1,
         borderColor: '#e2e8f0',
         borderRadius: 14,
         paddingVertical: 10,
-        paddingHorizontal: 12,
+        paddingHorizontal: 14,
     },
     metricLabel: {
         color: '#64748b',
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '700',
-        letterSpacing: 0.8,
+        letterSpacing: 0.5,
         textTransform: 'uppercase',
-        marginBottom: 2,
     },
     metricValue: {
         color: '#0f172a',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '800',
+        fontVariant: ['tabular-nums'], // Keeps time digits aligned dynamically
     },
     restInfo: {
         alignItems: 'flex-end',
-        backgroundColor: '#eff6ff',
+        backgroundColor: '#eef2ff',
         borderRadius: 14,
         borderWidth: 1,
-        borderColor: '#bfdbfe',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        minWidth: 92,
+        borderColor: '#c7d2fe',
+        borderLeftWidth: 3.5,
+        borderLeftColor: '#6366f1',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        minWidth: 96,
     },
     restLabel: {
-        color: '#475569',
+        color: '#4338ca',
         fontSize: 10,
-        fontWeight: '700',
+        fontWeight: '800',
         letterSpacing: 0.8,
         textTransform: 'uppercase',
     },
     restTime: {
-        color: '#1d4ed8',
-        fontSize: 18,
+        color: '#312e81',
+        fontSize: 17,
         fontWeight: '800',
-        marginTop: 4,
+        fontVariant: ['tabular-nums'],
+        marginTop: 1,
     },
     restProgressTrack: {
-        height: 9,
-        backgroundColor: 'rgba(148, 163, 184, 0.18)',
+        height: 6,
+        backgroundColor: '#e2e8f0',
         borderRadius: 999,
         overflow: 'hidden',
+        marginTop: 14,
     },
     restProgressFill: {
-        height: 9,
+        height: '100%',
         borderRadius: 999,
     },
     content: {
@@ -907,19 +983,19 @@ const styles = StyleSheet.create({
     exerciseCard: {
         backgroundColor: '#ffffff',
         borderRadius: 20,
-        padding: 14,
-        marginBottom: 18,
-        shadowColor: '#0f172a',
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 3,
+        padding: 16,
+        marginBottom: 16,
         borderWidth: 1,
-        borderColor: '#edf2f7',
+        borderColor: '#e2e8f0',
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.04,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 2,
     },
     exerciseCardCompleted: {
-        borderColor: '#c7f9d1',
-        backgroundColor: '#f8fff9',
+        borderColor: '#10b981',
+        backgroundColor: '#f0fdf4',
     },
     exerciseHeaderRow: {
         flexDirection: 'row',
@@ -929,55 +1005,59 @@ const styles = StyleSheet.create({
     },
     exerciseTitleWrap: {
         flex: 1,
-        paddingRight: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingRight: 8,
+    },
+    exerciseIndexBadge: {
+        backgroundColor: '#e0e7ff',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
     },
     exerciseIndex: {
-        color: '#4f46e5',
-        fontSize: 11,
+        color: '#4338ca',
+        fontSize: 12,
         fontWeight: '800',
-        letterSpacing: 0.7,
-        textTransform: 'uppercase',
-        marginBottom: 4,
     },
     exerciseName: {
-        fontSize: 19,
-        fontWeight: '800',
-        color: '#111827',
         flex: 1,
+        fontSize: 17,
+        fontWeight: '800',
+        color: '#0f172a',
+        letterSpacing: -0.3,
     },
     videoBtn: {
-        backgroundColor: '#ef4444',
-        paddingHorizontal: 12,
+        backgroundColor: '#f1f5f9',
+        borderWidth: 1,
+        borderColor: '#cbd5e1',
+        borderRadius: 10,
+        paddingHorizontal: 10,
         paddingVertical: 6,
-        borderRadius: 999,
     },
     videoBtnText: {
-        color: '#fff',
+        color: '#475569',
         fontSize: 11,
-        fontWeight: '800',
-        letterSpacing: 0.2,
+        fontWeight: '700',
     },
     exerciseMetaRow: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
+        gap: 6,
         marginBottom: 12,
-        gap: 8,
     },
     metaPill: {
-        backgroundColor: '#eef2ff',
-        color: '#4338ca',
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+    },
+    metaPillText: {
+        color: '#64748b',
         fontSize: 11,
         fontWeight: '700',
-        borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        overflow: 'hidden',
-    },
-    exerciseImage: {
-        width: '100%',
-        height: 200,
-        borderRadius: 16,
-        marginBottom: 12,
     },
     exerciseImagesRow: {
         flexDirection: 'row',
@@ -986,102 +1066,153 @@ const styles = StyleSheet.create({
     },
     exerciseImageThumb: {
         flex: 1,
-        height: 160,
-        borderRadius: 16,
-        backgroundColor: '#f3f4f6',
+        height: 100,
+        borderRadius: 12,
+        backgroundColor: '#f1f5f9',
     },
     exerciseImageFull: {
-        height: 200,
+        height: 140,
     },
-    exerciseInfo: {
+    muscleContainer: {
+        backgroundColor: '#f8fafc',
+        padding: 10,
+        borderRadius: 10,
+        marginBottom: 12,
+    },
+    muscleText: {
         fontSize: 12,
         color: '#475569',
-        marginBottom: 12,
-        lineHeight: 18,
+        lineHeight: 16,
+    },
+    muscleLabel: {
+        fontWeight: '700',
+        color: '#0f172a',
     },
     instructionsBlock: {
+        backgroundColor: '#f8fafc',
+        borderRadius: 12,
+        padding: 12,
         marginBottom: 14,
-        paddingHorizontal: 4,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
     },
     instructionsTitle: {
         fontSize: 12,
         fontWeight: '800',
-        color: '#111827',
-        marginBottom: 6,
-        letterSpacing: 0.5,
+        color: '#0f172a',
         textTransform: 'uppercase',
+        letterSpacing: 0.6,
+        marginBottom: 6,
     },
     instructionText: {
         fontSize: 12,
         color: '#475569',
         lineHeight: 18,
-        marginBottom: 3,
+        marginBottom: 4,
+    },
+    stepNumber: {
+        fontWeight: '700',
+        color: '#6366f1',
     },
     tableHeader: {
         flexDirection: 'row',
-        borderBottomWidth: 1,
-        borderColor: '#e5e7eb',
-        paddingBottom: 8,
-        marginBottom: 8,
         alignItems: 'center',
+        paddingHorizontal: 6,
+        marginBottom: 8,
     },
     colHeader: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '800',
-        color: '#64748b',
-        letterSpacing: 0.4,
-        textTransform: 'uppercase',
+        color: '#94a3b8',
+        letterSpacing: 0.8,
     },
     setRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 8,
-        paddingVertical: 6,
-        paddingHorizontal: 6,
+        backgroundColor: '#f8fafc',
         borderRadius: 12,
+        padding: 6,
+        marginBottom: 6,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        gap: 8,
     },
     setRowCompleted: {
-        backgroundColor: '#eefff2',
+        backgroundColor: '#ffffff',
+        borderColor: '#a7f3d0',
     },
     setNumber: {
-        width: 38,
+        width: 28,
+        textAlign: 'center',
+        fontSize: 14,
         fontWeight: '800',
-        color: '#334155',
-        fontSize: 13,
+        color: '#64748b',
     },
     input: {
         flex: 1,
-        backgroundColor: '#f8fafc',
-        borderRadius: 10,
+        height: 40,
+        backgroundColor: '#ffffff',
+        borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#e2e8f0',
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-        marginHorizontal: 4,
+        borderColor: '#cbd5e1',
         textAlign: 'center',
+        fontSize: 15,
         fontWeight: '700',
         color: '#0f172a',
-        fontSize: 14,
+        paddingHorizontal: 8,
+    },
+    inputCompleted: {
+        backgroundColor: '#f0fdf4',
+        borderColor: '#6ee7b7',
+        color: '#065f46',
     },
     checkBtn: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        borderWidth: 2,
+        width: 44,
+        height: 40,
+        borderRadius: 8,
+        backgroundColor: '#e2e8f0',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    checkBtnActive: {
+        backgroundColor: '#10b981',
+    },
+    checkBtnText: {
+        color: '#ffffff',
+        fontSize: 16,
+        fontWeight: '900',
+    },
+    // Styles for the ? button and dropdown block
+    infoBtn: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#f1f5f9',
+        borderWidth: 1,
         borderColor: '#cbd5e1',
-        backgroundColor: '#fff',
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: 6,
     },
-    checkBtnActive: {
-        backgroundColor: '#22c55e',
-        borderColor: '#22c55e',
+    infoBtnActive: {
+        backgroundColor: '#6366f1',
+        borderColor: '#4f46e5',
     },
-    checkBtnText: {
-        color: '#fff',
-        fontWeight: '900',
-        fontSize: 15,
+    infoBtnText: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#64748b',
+    },
+    infoBtnTextActive: {
+        color: '#ffffff',
+    },
+    infoDropdownBlock: {
+        backgroundColor: '#f8fafc',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
     },
     footer: {
         paddingHorizontal: 16,
@@ -1117,50 +1248,108 @@ const styles = StyleSheet.create({
     },
     restModalContainer: {
         flex: 1,
-        backgroundColor: '#0f172a',
-        justifyContent: 'center',
+        backgroundColor: '#ffffff',
         alignItems: 'center',
-        padding: 20,
+        justifyContent: 'space-between',
+        paddingTop: 12,
+        paddingBottom: 40,
+        paddingHorizontal: 24,
+    },
+    dragHandle: {
+        width: 36,
+        height: 5,
+        backgroundColor: '#e2e8f0',
+        borderRadius: 999,
+        marginBottom: 20,
+    },
+    restModalKicker: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#6366f1',
+        textTransform: 'uppercase',
+        letterSpacing: 1.2,
     },
     restModalTitle: {
-        color: '#f8fafc',
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: '800',
-        marginBottom: 26,
+        color: '#0f172a',
+        letterSpacing: -0.5,
+        marginBottom: 20,
+    },
+    timerCircle: {
+        width: 220,
+        height: 220,
+        borderRadius: 110,
+        backgroundColor: '#f8fafc',
+        borderWidth: 8,
+        borderColor: '#e0e7ff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#6366f1',
+        shadowOpacity: 0.08,
+        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 4,
+        marginVertical: 20,
     },
     restModalTime: {
-        color: '#34d399',
-        fontSize: 96,
-        fontWeight: '800',
+        fontSize: 48,
+        fontWeight: '900',
+        color: '#0f172a',
+        letterSpacing: -1,
         fontVariant: ['tabular-nums'],
-        marginBottom: 54,
+    },
+    timerSubtext: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#94a3b8',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+        marginTop: 2,
     },
     restModalActions: {
         flexDirection: 'row',
-        marginBottom: 30,
+        gap: 12,
+        width: '100%',
+        marginTop: 20,
     },
     restModalButton: {
-        backgroundColor: '#1e293b',
-        paddingVertical: 14,
-        paddingHorizontal: 28,
-        borderRadius: 14,
-        marginHorizontal: 10,
+        flex: 1,
+        height: 54,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    restModalButtonSkip: {
-        backgroundColor: '#ef4444',
+    buttonAdd: {
+        backgroundColor: '#6366f1',
+        shadowColor: '#6366f1',
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 3,
     },
-    restModalButtonText: {
-        color: '#fff',
-        fontSize: 18,
+    buttonAddText: {
+        color: '#ffffff',
+        fontSize: 17,
+        fontWeight: '800',
+    },
+    buttonSkip: {
+        backgroundColor: '#f1f5f9',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    buttonSkipText: {
+        color: '#475569',
+        fontSize: 16,
         fontWeight: '700',
     },
     restModalCloseBtn: {
-        marginTop: 16,
-        padding: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
     },
     restModalCloseText: {
-        color: '#93c5fd',
-        fontSize: 16,
+        color: '#64748b',
+        fontSize: 14,
         fontWeight: '700',
     },
     videoModalContainer: {

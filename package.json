@@ -18,8 +18,11 @@
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-dotenv": "^5.0.0",
+    "react-native-gifted-charts": "^1.4.81",
+    "react-native-linear-gradient": "^2.8.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
+    "react-native-svg": "^15.15.5",
     "react-native-webview": "13.16.1",
     "react-native-youtube-iframe": "^2.4.1",
     "zustand": "^5.0.15"

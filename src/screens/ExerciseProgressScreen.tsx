@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute } from '@react-navigation/native';
 import { getDb } from '../database/db';
+import { ExerciseProgressChart } from '../components/ExerciseProgressChart';
 
 interface ProgressDataPoint {
     date: string;
@@ -97,6 +98,11 @@ export default function ExerciseProgressScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
+
+            <Text style={styles.header}>{exerciseName}</Text>
+
+            {/* Progression Line Chart */}
+            <ExerciseProgressChart exerciseId={exerciseId} />
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <Text style={styles.headerTitle}>📈 Progressi: {exerciseName}</Text>
 
@@ -150,7 +156,8 @@ export default function ExerciseProgressScreen() {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f4f4f6' },
+    container: { flex: 1, backgroundColor: '#f8fafc', padding: 16 },
+    header: { fontSize: 22, fontWeight: '800', color: '#0f172a' },
     scrollContent: { padding: 16 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#1c1c1e', marginBottom: 16 },
