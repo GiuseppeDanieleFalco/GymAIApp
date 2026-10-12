@@ -20,6 +20,11 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Clear Gradle Cache Directory
+        run: |
+          rm -rf ~/.gradle/caches/
+          rm -rf ~/.gradle/wrapper/
+
       - name: Install dependencies
         run: npm ci
 
@@ -46,8 +51,6 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease \
             --no-daemon \
-            --max-workers=2 \
-            --no-parallel \
             --stacktrace \
             --info \
             --console=plain
