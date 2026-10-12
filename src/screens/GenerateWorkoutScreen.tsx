@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AIWorkoutInput } from '../types/workout';
 import { generateWorkoutPlan, saveAIGeneratedPlanToDb } from '../services/aiGenerator';
 import { getAllGroups, createGroup, WorkoutGroup } from '../database/groupQueries';
+import { colors } from '../theme/colors';
 
 const EQUIPMENT_OPTIONS = [
     'Manubri',
@@ -93,8 +94,8 @@ export default function GenerateWorkoutScreen({ navigation }: any) {
                 day: '2-digit', month: '2-digit', year: 'numeric',
             });
             const defaultName = `Workout - ${today}`;
-            // Colore di default per il gruppo AI (blu)
-            const defaultColor = '#2563EB';
+            // Colore di default per il gruppo AI
+            const defaultColor = colors.primary;
             const newGroupId = await createGroup(defaultName, defaultColor);
             setSelectedGroupId(newGroupId);
             // Ricarica la lista aggiornata
@@ -317,7 +318,7 @@ export default function GenerateWorkoutScreen({ navigation }: any) {
                         style={styles.modifyButton}
                         onPress={() => setIsEquipmentModalVisible(true)}
                     >
-                        <Ionicons name="add-circle-outline" size={18} color="#2563EB" style={{ marginRight: 6 }} />
+                        <Ionicons name="add-circle-outline" size={18} color={colors.primary} style={{ marginRight: 6 }} />
                         <Text style={styles.modifyButtonText}>Aggiungi/Rimuovi Attrezzi</Text>
                     </TouchableOpacity>
                 </View>
@@ -574,8 +575,8 @@ const styles = StyleSheet.create({
         borderColor: '#CBD5E1',
     },
     chipSelected: {
-        backgroundColor: '#60A0EA',
-        borderColor: '#60A0EA',
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
     },
     chipText: {
         fontSize: 13,
@@ -583,7 +584,7 @@ const styles = StyleSheet.create({
     },
     chipTextSelected: {
         color: '#FFFFFF',
-        fontWeight: '600',
+        fontWeight: '700',
     },
     disclaimerBox: {
         flexDirection: 'row',
@@ -602,19 +603,19 @@ const styles = StyleSheet.create({
     },
     submitButton: {
         flexDirection: 'row',
-        backgroundColor: '#2563EB',
+        backgroundColor: colors.primary,
         borderRadius: 12,
         paddingVertical: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#2563EB',
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
+        shadowOpacity: 0.25,
         shadowRadius: 8,
         elevation: 4,
     },
     submitButtonDisabled: {
-        backgroundColor: '#93C5FD',
+        backgroundColor: '#D1A3B5',
     },
     submitButtonText: {
         color: '#FFFFFF',
@@ -629,7 +630,7 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
     modifyButtonText: {
-        color: '#2563EB',
+        color: colors.primary,
         fontSize: 14,
         fontWeight: '600',
     },
@@ -653,7 +654,7 @@ const styles = StyleSheet.create({
     },
     modalCloseText: {
         fontSize: 16,
-        color: '#2563EB',
+        color: colors.primary,
         fontWeight: '600',
     },
     modalContent: {
@@ -676,7 +677,7 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     customEquipmentAddBtn: {
-        backgroundColor: '#2563EB',
+        backgroundColor: colors.primary,
         borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',

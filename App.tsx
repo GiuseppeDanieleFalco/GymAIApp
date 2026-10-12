@@ -4,6 +4,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { initDatabase } from './src/database/db';
+import { colors, headerTheme } from './src/theme/colors';
+import HeaderBackButton from './src/components/HeaderBackButton';
 
 import WorkoutsListScreen from './src/screens/WorkoutsListScreen';
 import WorkoutDetailScreen from './src/screens/WorkoutDetailScreen';
@@ -34,7 +36,7 @@ export default function App() {
   if (!isDbReady) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Preparazione ambiente fitness...</Text>
       </View>
     );
@@ -45,9 +47,8 @@ export default function App() {
       <Stack.Navigator
         initialRouteName="WorkoutsList"
         screenOptions={{
-          headerStyle: { backgroundColor: '#FFFFFF' },
-          headerTintColor: '#0F172A',
-          headerTitleStyle: { fontWeight: 'bold' },
+          ...headerTheme,
+          headerLeft: ({ canGoBack }) => (canGoBack ? <HeaderBackButton /> : null),
         }}
       >
         <Stack.Screen
@@ -68,7 +69,10 @@ export default function App() {
         <Stack.Screen
           name="ActiveSession"
           component={ActiveSessionScreen}
-          options={{ title: 'Allenamento in corso', headerLeft: () => null }} // Impedisce il tasto back accidentale
+          options={{
+            title: 'Allenamento in corso',
+            headerShown: false, // ActiveSessionScreen has its own custom workout hud header
+          }}
         />
         <Stack.Screen
           name="WorkoutHistory"

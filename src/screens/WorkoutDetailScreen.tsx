@@ -14,6 +14,7 @@ import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { getWorkoutDetails, WorkoutItem, WorkoutExerciseItem } from '../database/workoutQueries';
 import { getDb } from '../database/db';
+import { colors } from '../theme/colors';
 
 const parseStringArray = (value: string | null | undefined): string[] => {
     try {
@@ -123,7 +124,7 @@ export default function WorkoutDetailScreen({ route, navigation }: any) {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#2563EB" />
+                <ActivityIndicator size="large" color={colors.primary} />
             </View>
         );
     }
@@ -146,13 +147,13 @@ export default function WorkoutDetailScreen({ route, navigation }: any) {
 
                     <View style={styles.metaRow}>
                         <View style={styles.metaBadge}>
-                            <Ionicons name="barbell-outline" size={14} color="#2563EB" />
+                            <Ionicons name="barbell-outline" size={14} color={colors.primary} />
                             <Text style={styles.metaText}>{exercises.length} Esercizi</Text>
                         </View>
                         {workout.is_ai_generated === 1 && (
-                            <View style={[styles.metaBadge, { backgroundColor: '#F0FDF4' }]}>
-                                <Ionicons name="sparkles-outline" size={14} color="#16A34A" />
-                                <Text style={[styles.metaText, { color: '#16A34A' }]}>Generata con IA</Text>
+                            <View style={[styles.metaBadge, { backgroundColor: colors.secondarySubtle }]}>
+                                <Ionicons name="sparkles-outline" size={14} color={colors.secondary} />
+                                <Text style={[styles.metaText, { color: colors.secondary }]}>Generata con IA</Text>
                             </View>
                         )}
                     </View>
@@ -194,12 +195,12 @@ export default function WorkoutDetailScreen({ route, navigation }: any) {
                                 <TouchableOpacity
                                     onPress={() =>
                                         navigation.navigate('ExerciseProgress', {
-                                            exerciseId: ex.id,
-                                            exerciseName: ex.exercise_name,
-                                        })
+                                             exerciseId: ex.id,
+                                             exerciseName: ex.exercise_name,
+                                         })
                                     }
                                 >
-                                    <Text style={{ color: '#007AFF', fontSize: 13, marginTop: 4 }}>📈 Progressi</Text>
+                                    <Text style={{ color: colors.primary, fontSize: 13, marginTop: 4, fontWeight: '600' }}>📈 Progressi</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -280,45 +281,52 @@ const styles = StyleSheet.create({
     metaBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#EFF6FF',
+        backgroundColor: colors.primarySubtle,
+        borderWidth: 1,
+        borderColor: colors.primaryBorder,
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 16,
         marginRight: 8,
     },
-    metaText: { fontSize: 12, fontWeight: '600', color: '#2563EB', marginLeft: 4 },
-    sectionHeader: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', marginBottom: 12 },
+    metaText: { fontSize: 12, fontWeight: '700', color: colors.primary, marginLeft: 4 },
+    sectionHeader: { fontSize: 17, fontWeight: '800', color: '#1E293B', marginBottom: 12 },
     exerciseCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 12,
+        borderRadius: 14,
         padding: 14,
         marginBottom: 10,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: '#F1F5F9',
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 5,
+        elevation: 2,
     },
     exerciseHeader: { flexDirection: 'row', alignItems: 'center' },
     exerciseNumber: {
         width: 28,
         height: 28,
         borderRadius: 14,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: colors.primarySubtle,
         textAlign: 'center',
         lineHeight: 28,
         fontWeight: 'bold',
-        color: '#475569',
+        color: colors.primary,
     },
-    exerciseName: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
+    exerciseName: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
     equipmentText: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
     statsRow: {
         flexDirection: 'row',
         justifyContent: 'space-around',
         backgroundColor: '#F8FAFC',
-        borderRadius: 8,
+        borderRadius: 10,
         paddingVertical: 8,
         marginTop: 10,
     },
     statBox: { alignItems: 'center' },
-    statLabel: { fontSize: 11, color: '#64748B' },
+    statLabel: { fontSize: 11, color: '#64748B', fontWeight: '500' },
     statValue: { fontSize: 14, fontWeight: 'bold', color: '#0F172A', marginTop: 2 },
     exerciseMetadata: { marginTop: 10, gap: 4 },
     metadataText: { fontSize: 12, color: '#475569', lineHeight: 17 },
@@ -332,17 +340,27 @@ const styles = StyleSheet.create({
         right: 0,
         backgroundColor: '#FFFFFF',
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: 14,
         borderTopWidth: 1,
-        borderTopColor: '#E2E8F0',
+        borderTopColor: '#F1F5F9',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 4,
     },
     startButton: {
         flexDirection: 'row',
-        backgroundColor: '#16A34A',
+        backgroundColor: colors.primary,
         borderRadius: 12,
-        paddingVertical: 14,
+        paddingVertical: 15,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 4,
     },
     startButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
     editBtn: {

@@ -16,6 +16,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { getDb } from '../database/db';
 import { createGroup, getAllGroups, WorkoutGroup } from '../database/groupQueries';
 import { searchExercises, findExerciseMetadata, ExerciseDbEntry } from '../services/exerciseImageLookup';
+import { colors } from '../theme/colors';
 
 interface ExerciseFormItem {
     id?: string;
@@ -68,8 +69,8 @@ export default function WorkoutFormScreen() {
                 day: '2-digit', month: '2-digit', year: 'numeric',
             });
             const defaultName = `Workout - ${today}`;
-            // Colore di default per il gruppo AI (blu)
-            const defaultColor = '#2563EB';
+            // Colore di default per il gruppo AI
+            const defaultColor = colors.primary;
             const newGroupId = await createGroup(defaultName, defaultColor);
             setSelectedGroupId(newGroupId);
             // Ricarica la lista aggiornata
@@ -531,13 +532,18 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         borderStyle: 'dashed',
     },
-    addBtnText: { color: '#007AFF', fontWeight: 'bold', fontSize: 15 },
+    addBtnText: { color: colors.primary, fontWeight: 'bold', fontSize: 15 },
     saveBtn: {
-        backgroundColor: '#34C759',
-        paddingVertical: 14,
-        borderRadius: 10,
+        backgroundColor: colors.primary,
+        paddingVertical: 15,
+        borderRadius: 12,
         alignItems: 'center',
         marginBottom: 30,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 4,
     },
     saveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
     suggestionBox: {
@@ -572,7 +578,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     metaChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-    chipPrimary: { backgroundColor: '#EAF2FF', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 4 },
+    chipPrimary: { backgroundColor: colors.secondarySubtle, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 4 },
     chipSecondary: { backgroundColor: '#F1F3F5', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 4 },
     chipText: { fontSize: 11, color: '#334155' },
     groupScroll: { marginBottom: 12 },
@@ -582,7 +588,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14, paddingVertical: 8,
         marginRight: 8, borderWidth: 1, borderColor: '#CBD5E1',
     },
-    groupChipSelected: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
+    groupChipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
     groupChipText: { fontSize: 13, color: '#334155' },
     groupChipTextSelected: { color: '#fff', fontWeight: '600' },
     chipDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },

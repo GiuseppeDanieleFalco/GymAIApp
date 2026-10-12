@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getDb } from '../database/db';
+import { colors } from '../theme/colors';
 
 interface HistorySession {
     id: string;
@@ -296,7 +297,7 @@ export default function WorkoutHistoryScreen({ navigation }: any) {
     if (loading) {
         return (
             <View style={styles.center}>
-                <ActivityIndicator size="large" color="#6366f1" />
+                <ActivityIndicator size="large" color={colors.primary} />
             </View>
         );
     }
@@ -304,7 +305,7 @@ export default function WorkoutHistoryScreen({ navigation }: any) {
     return (
         <SafeAreaView style={styles.container}>
             {/* Header Title */}
-            <Text style={styles.headerTitle}>📊 Analisi & Storico</Text>
+            <Text style={styles.headerTitle}>Analisi & Storico</Text>
 
             {/* Segmented Tab Bar */}
             <View style={styles.tabContainer}>
@@ -384,15 +385,21 @@ const styles = StyleSheet.create({
     /* Segmented Tabs */
     tabContainer: {
         flexDirection: 'row',
-        backgroundColor: '#e2e8f0',
-        borderRadius: 12,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 14,
         padding: 4,
         marginBottom: 16,
     },
-    tabButton: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
-    tabButtonActive: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 3 },
+    tabButton: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+    tabButtonActive: {
+        backgroundColor: '#ffffff',
+        shadowColor: colors.primary,
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 2,
+    },
     tabText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
-    tabTextActive: { color: '#6366f1' },
+    tabTextActive: { color: colors.primary, fontWeight: '700' },
 
     /* Metric Cards */
     kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
@@ -403,9 +410,10 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         borderWidth: 1,
         borderColor: '#f1f5f9',
-        shadowColor: '#000',
-        shadowOpacity: 0.02,
+        shadowColor: colors.primary,
+        shadowOpacity: 0.03,
         shadowRadius: 5,
+        elevation: 1,
     },
     kpiValue: { fontSize: 20, fontWeight: '800', color: '#0f172a' },
     kpiLabel: { fontSize: 12, fontWeight: '600', color: '#64748b', marginTop: 2 },
@@ -417,6 +425,10 @@ const styles = StyleSheet.create({
         padding: 16,
         borderWidth: 1,
         borderColor: '#f1f5f9',
+        shadowColor: colors.primary,
+        shadowOpacity: 0.03,
+        shadowRadius: 5,
+        elevation: 1,
     },
     sectionTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 16 },
     barRow: { marginBottom: 12 },
@@ -424,8 +436,8 @@ const styles = StyleSheet.create({
     barLabel: { fontSize: 13, fontWeight: '700', color: '#334155', textTransform: 'capitalize' },
     barValue: { fontSize: 12, color: '#64748b', fontWeight: '600' },
     barTrack: { height: 10, backgroundColor: '#f1f5f9', borderRadius: 5, flexDirection: 'row', overflow: 'hidden' },
-    barFillPrimary: { height: '100%', backgroundColor: '#6366f1' },
-    barFillSecondary: { height: '100%', backgroundColor: '#a5b4fc' },
+    barFillPrimary: { height: '100%', backgroundColor: colors.primary },
+    barFillSecondary: { height: '100%', backgroundColor: colors.secondaryLight },
     legendRow: { flexDirection: 'row', gap: 16, marginTop: 12, justifyContent: 'flex-end' },
     legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     legendDot: { width: 8, height: 8, borderRadius: 4 },

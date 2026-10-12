@@ -18,18 +18,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
+          cache: npm
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
-          distribution: "zulu"
+          distribution: zulu
           java-version: "17"
+          cache: gradle
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
-        with:
-          packages: ""
 
       - name: Install dependencies
         run: npm ci
@@ -45,10 +44,17 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace --info
+          ./gradlew assembleRelease \
+            --no-daemon \
+            --max-workers=2 \
+            --no-parallel \
+            --stacktrace \
+            --info \
+            --console=plain
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error

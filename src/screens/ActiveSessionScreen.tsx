@@ -23,6 +23,8 @@ import notifee, { AndroidImportance, EventType, TriggerType } from '@notifee/rea
 import type { TimestampTrigger } from '@notifee/react-native';
 import { useActiveSessionStore, ExerciseItem } from '../store/activeSessionStore';
 import { findExerciseImageUrls, IMAGE_BASE_URL } from '../services/exerciseImageLookup';
+import { colors } from '../theme/colors';
+import HeaderBackButton from '../components/HeaderBackButton';
 
 type RootStackParamList = {
     ActiveSession: { workoutId: string; workoutTitle: string };
@@ -571,14 +573,33 @@ export default function ActiveSessionScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             ><View style={styles.header}>
                     <View style={styles.headerTop}>
+                        <HeaderBackButton
+                            onPress={() => {
+                                Alert.alert(
+                                    "Abbandonare l'allenamento?",
+                                    'Sei sicuro di voler uscire? I progressi non salvati andranno persi.',
+                                    [
+                                        { text: 'Annulla', style: 'cancel' },
+                                        {
+                                            text: 'Esci',
+                                            style: 'destructive',
+                                            onPress: () => {
+                                                activeSessionStore.clearSession();
+                                                navigation.navigate('WorkoutsList');
+                                            },
+                                        },
+                                    ]
+                                );
+                            }}
+                        />
                         <View style={styles.titleWrap}>
-                            <Text style={styles.kicker}>Workout</Text>
+                            <Text style={styles.kicker}>Sessione Attiva</Text>
                             <Text style={styles.title} numberOfLines={1}>{workoutTitle}</Text>
                         </View>
 
@@ -867,33 +888,33 @@ export default function ActiveSessionScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#eef4ff',
+        backgroundColor: '#FAF5F7',
     },
     header: {
-        paddingHorizontal: 20,
-        paddingTop: 16,
+        paddingHorizontal: 16,
+        paddingTop: 12,
         paddingBottom: 16,
         backgroundColor: '#ffffff',
         borderBottomLeftRadius: 24,
         borderBottomRightRadius: 24,
-        shadowColor: '#0f172a',
-        shadowOpacity: 0.04,
+        shadowColor: colors.primary,
+        shadowOpacity: 0.06,
         shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
+        shadowOffset: { width: 0, height: 4 },
         elevation: 3,
     },
     headerTop: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 14,
     },
     titleWrap: {
         flex: 1,
-        paddingRight: 12,
+        paddingRight: 8,
+        marginLeft: 4,
     },
     kicker: {
-        color: '#6366f1',
+        color: colors.primary,
         fontSize: 11,
         fontWeight: '800',
         letterSpacing: 1.1,
@@ -901,7 +922,7 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     title: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '800',
         color: '#0f172a',
         letterSpacing: -0.4,
@@ -937,33 +958,33 @@ const styles = StyleSheet.create({
     },
     restInfo: {
         alignItems: 'flex-end',
-        backgroundColor: '#eef2ff',
+        backgroundColor: colors.secondarySubtle,
         borderRadius: 14,
         borderWidth: 1,
-        borderColor: '#c7d2fe',
+        borderColor: colors.secondaryBorder,
         borderLeftWidth: 3.5,
-        borderLeftColor: '#6366f1',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        minWidth: 96,
+        borderLeftColor: colors.secondary,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        minWidth: 88,
     },
     restLabel: {
-        color: '#4338ca',
+        color: colors.secondaryDark,
         fontSize: 10,
         fontWeight: '800',
         letterSpacing: 0.8,
         textTransform: 'uppercase',
     },
     restTime: {
-        color: '#312e81',
-        fontSize: 17,
+        color: colors.secondary,
+        fontSize: 16,
         fontWeight: '800',
         fontVariant: ['tabular-nums'],
         marginTop: 1,
     },
     restProgressTrack: {
         height: 6,
-        backgroundColor: '#e2e8f0',
+        backgroundColor: '#F1F5F9',
         borderRadius: 999,
         overflow: 'hidden',
         marginTop: 14,
@@ -1217,19 +1238,24 @@ const styles = StyleSheet.create({
     footer: {
         paddingHorizontal: 16,
         paddingVertical: 14,
-        backgroundColor: '#f8fbff',
+        backgroundColor: '#FFFFFF',
         borderTopWidth: 1,
-        borderColor: '#dfeaf6',
+        borderColor: '#F1F5F9',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 4,
     },
     finishButton: {
-        backgroundColor: '#2563eb',
+        backgroundColor: colors.primary,
         paddingVertical: 16,
-        borderRadius: 16,
+        borderRadius: 14,
         alignItems: 'center',
-        shadowColor: '#2563eb',
-        shadowOpacity: 0.18,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 8 },
+        shadowColor: colors.primary,
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
         elevation: 4,
     },
     finishButtonText: {
@@ -1240,7 +1266,7 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
     },
     finishButtonSubtext: {
-        color: 'rgba(255,255,255,0.8)',
+        color: '#FCE7F0',
         fontSize: 11,
         fontWeight: '700',
         marginTop: 4,
@@ -1265,7 +1291,7 @@ const styles = StyleSheet.create({
     restModalKicker: {
         fontSize: 12,
         fontWeight: '800',
-        color: '#6366f1',
+        color: colors.primary,
         textTransform: 'uppercase',
         letterSpacing: 1.2,
     },
@@ -1280,13 +1306,13 @@ const styles = StyleSheet.create({
         width: 220,
         height: 220,
         borderRadius: 110,
-        backgroundColor: '#f8fafc',
+        backgroundColor: '#FAF5F7',
         borderWidth: 8,
-        borderColor: '#e0e7ff',
+        borderColor: colors.primarySubtle,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#6366f1',
-        shadowOpacity: 0.08,
+        shadowColor: colors.primary,
+        shadowOpacity: 0.12,
         shadowRadius: 20,
         shadowOffset: { width: 0, height: 8 },
         elevation: 4,
@@ -1295,7 +1321,7 @@ const styles = StyleSheet.create({
     restModalTime: {
         fontSize: 48,
         fontWeight: '900',
-        color: '#0f172a',
+        color: colors.primary,
         letterSpacing: -1,
         fontVariant: ['tabular-nums'],
     },
@@ -1321,8 +1347,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     buttonAdd: {
-        backgroundColor: '#6366f1',
-        shadowColor: '#6366f1',
+        backgroundColor: colors.secondary,
+        shadowColor: colors.secondary,
         shadowOpacity: 0.25,
         shadowRadius: 10,
         shadowOffset: { width: 0, height: 4 },

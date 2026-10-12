@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute } from '@react-navigation/native';
 import { getDb } from '../database/db';
 import { ExerciseProgressChart } from '../components/ExerciseProgressChart';
+import { colors } from '../theme/colors';
 
 interface ProgressDataPoint {
     date: string;
@@ -88,7 +89,7 @@ export default function ExerciseProgressScreen() {
     if (loading) {
         return (
             <View style={styles.center}>
-                <ActivityIndicator size="large" color="#007AFF" />
+                <ActivityIndicator size="large" color={colors.primary} />
             </View>
         );
     }
@@ -162,14 +163,18 @@ const styles = StyleSheet.create({
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#1c1c1e', marginBottom: 16 },
     prCard: {
-        backgroundColor: '#007AFF',
-        borderRadius: 12,
+        backgroundColor: colors.primary,
+        borderRadius: 14,
         padding: 20,
         alignItems: 'center',
         marginBottom: 20,
-        elevation: 3,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 4,
     },
-    prLabel: { color: 'rgba(255, 255, 255, 0.8)', fontSize: 13, fontWeight: '600' },
+    prLabel: { color: 'rgba(255, 255, 255, 0.85)', fontSize: 13, fontWeight: '600' },
     prValue: { color: '#fff', fontSize: 36, fontWeight: 'bold', marginTop: 4 },
     unit: { fontSize: 20, fontWeight: 'normal' },
     sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1c1c1e', marginBottom: 12, marginTop: 8 },
@@ -177,18 +182,25 @@ const styles = StyleSheet.create({
     emptyText: { color: '#8e8e93', textAlign: 'center', fontSize: 15 },
     chartContainer: {
         backgroundColor: '#fff',
-        borderRadius: 12,
+        borderRadius: 14,
         padding: 16,
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'flex-end',
         height: 180,
         marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
     },
     barGroup: { alignItems: 'center', flex: 1 },
-    barValue: { fontSize: 10, color: '#007AFF', fontWeight: 'bold', marginBottom: 4 },
-    barTrack: { width: 14, height: 100, backgroundColor: '#e5e5ea', borderRadius: 7, justifyContent: 'flex-end', overflow: 'hidden' },
-    barFill: { backgroundColor: '#007AFF', width: '100%', borderRadius: 7 },
+    barValue: { fontSize: 10, color: colors.primary, fontWeight: 'bold', marginBottom: 4 },
+    barTrack: { width: 14, height: 100, backgroundColor: '#f1f5f9', borderRadius: 7, justifyContent: 'flex-end', overflow: 'hidden' },
+    barFill: { backgroundColor: colors.primary, width: '100%', borderRadius: 7 },
     barLabel: { fontSize: 10, color: '#8e8e93', marginTop: 6 },
     historyRow: {
         backgroundColor: '#fff',

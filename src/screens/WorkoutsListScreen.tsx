@@ -10,6 +10,7 @@ import { getAllWorkouts, WorkoutItem } from '../database/workoutQueries';
 import { getAllGroups, assignWorkoutToGroup, WorkoutGroup } from '../database/groupQueries';
 import { getDb } from '../database/db';
 import { useActiveSessionStore } from '../store/activeSessionStore';
+import { colors } from '../theme/colors';
 
 type WorkoutSection = {
     groupId: string | null;
@@ -102,7 +103,7 @@ export default function WorkoutsListScreen({ navigation }: any) {
                 sections.push({
                     groupId,
                     title: items[0].group_name ?? 'Gruppo',
-                    color: items[0].group_color ?? '#2563EB',
+                    color: items[0].group_color ?? colors.primary,
                     data: items,
                 });
             }
@@ -135,7 +136,7 @@ export default function WorkoutsListScreen({ navigation }: any) {
                     <Text style={styles.cardTitle}>{item.title}</Text>
                     {item.is_ai_generated === 1 && (
                         <View style={styles.badgeAi}>
-                            <Ionicons name="sparkles" size={12} color="#2563EB" />
+                            <Ionicons name="sparkles" size={12} color={colors.secondary} />
                             <Text style={styles.badgeAiText}>AI</Text>
                         </View>
                     )}
@@ -150,7 +151,7 @@ export default function WorkoutsListScreen({ navigation }: any) {
                         <Ionicons
                             name={item.group_id ? 'folder' : 'folder-outline'}
                             size={19}
-                            color={item.group_id ? (item.group_color ?? '#2563EB') : '#94A3B8'}
+                            color={item.group_id ? (item.group_color ?? colors.primary) : '#94A3B8'}
                         />
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -201,15 +202,18 @@ export default function WorkoutsListScreen({ navigation }: any) {
                     <TouchableOpacity
                         style={styles.headerBtn}
                         onPress={() => navigation.navigate('WorkoutGroups')}
+                        activeOpacity={0.7}
                     >
-                        <Ionicons name="folder-open-outline" size={15} color="#007AFF" />
+                        <Ionicons name="folder-open-outline" size={15} color={colors.primary} />
                         <Text style={styles.headerBtnText}>Gruppi</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.historyBtn}
                         onPress={() => navigation.navigate('WorkoutHistory')}
+                        activeOpacity={0.7}
                     >
-                        <Text style={styles.historyBtnText}>📜 Storico</Text>
+                        <Ionicons name="stats-chart-outline" size={14} color={colors.secondary} />
+                        <Text style={styles.historyBtnText}>Storico</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -296,7 +300,7 @@ export default function WorkoutsListScreen({ navigation }: any) {
                                     <View style={[styles.groupOptionDot, { backgroundColor: g.color }]} />
                                     <Text style={styles.groupOptionName}>{g.name}</Text>
                                     {assignTarget?.group_id === g.id && (
-                                        <Ionicons name="checkmark-circle" size={20} color="#2563EB" />
+                                        <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
                                     )}
                                 </TouchableOpacity>
                             )}
@@ -337,53 +341,66 @@ const styles = StyleSheet.create({
     // Header
     headerRow: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 16, marginBottom: 8,
+        paddingHorizontal: 16, marginBottom: 12, marginTop: 4,
     },
-    headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#0F172A' },
+    headerTitle: { fontSize: 24, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5 },
     headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     headerBtn: {
-        flexDirection: 'row', alignItems: 'center', gap: 4,
-        backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8,
+        flexDirection: 'row', alignItems: 'center', gap: 5,
+        backgroundColor: colors.primarySubtle,
+        borderWidth: 1, borderColor: colors.primaryBorder,
+        paddingHorizontal: 11, paddingVertical: 7, borderRadius: 20,
     },
-    headerBtnText: { color: '#007AFF', fontWeight: '600', fontSize: 13 },
-    historyBtn: { backgroundColor: '#e5e5ea', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-    historyBtnText: { color: '#007AFF', fontWeight: '600', fontSize: 13 },
+    headerBtnText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+    historyBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 5,
+        backgroundColor: colors.secondarySubtle,
+        borderWidth: 1, borderColor: colors.secondaryBorder,
+        paddingHorizontal: 11, paddingVertical: 7, borderRadius: 20,
+    },
+    historyBtnText: { color: colors.secondary, fontWeight: '700', fontSize: 13 },
 
     // List
     listContent: { padding: 16, paddingBottom: 100 },
 
     // Section
     sectionHeader: {
-        padding: 10,
-        backgroundColor: 'white',
-        flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 10,
+        paddingVertical: 8,
+        paddingHorizontal: 4,
+        flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 8,
     },
     sectionDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
     sectionTitle: { fontSize: 15, fontWeight: '700', color: '#334155', flex: 1 },
     sectionCount: {
-        fontSize: 12, fontWeight: '600', color: '#94A3B8',
-        backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10,
+        fontSize: 12, fontWeight: '700', color: colors.primary,
+        backgroundColor: colors.primarySubtle, paddingHorizontal: 9, paddingVertical: 2, borderRadius: 10,
     },
 
     // Card
     card: {
-        backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 10,
-        borderWidth: 1, borderColor: '#E2E8F0',
+        backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, marginBottom: 12,
+        borderWidth: 1, borderColor: '#F1F5F9',
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
     },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     titleContainer: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 },
-    cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#1E293B', flexShrink: 1 },
+    cardTitle: { fontSize: 16, fontWeight: '700', color: '#1E293B', flexShrink: 1 },
     badgeAi: {
-        flexDirection: 'row', alignItems: 'center', backgroundColor: '#DBEAFE',
-        paddingHorizontal: 6, paddingVertical: 2, borderRadius: 12, marginLeft: 8,
+        flexDirection: 'row', alignItems: 'center', backgroundColor: colors.secondarySubtle,
+        borderWidth: 1, borderColor: colors.secondaryBorder,
+        paddingHorizontal: 7, paddingVertical: 2, borderRadius: 12, marginLeft: 8,
     },
-    badgeAiText: { fontSize: 10, fontWeight: 'bold', color: '#2563EB', marginLeft: 2 },
+    badgeAiText: { fontSize: 10, fontWeight: '800', color: colors.secondary, marginLeft: 3 },
     cardActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     folderBtn: {},
-    cardDescription: { fontSize: 13, color: '#64748B', marginTop: 6, marginBottom: 12 },
-    cardFooter: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 10 },
+    cardDescription: { fontSize: 13, color: '#64748B', marginTop: 6, marginBottom: 12, lineHeight: 18 },
+    cardFooter: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F8FAFC', paddingTop: 10 },
     infoTag: { flexDirection: 'row', alignItems: 'center', marginRight: 16 },
-    infoText: { fontSize: 12, color: '#64748B', marginLeft: 4 },
+    infoText: { fontSize: 12, color: '#64748B', marginLeft: 4, fontWeight: '500' },
 
     // Empty
     emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
@@ -397,26 +414,28 @@ const styles = StyleSheet.create({
     actionButtonsRow: {
         position: 'absolute', bottom: 0, left: 0, right: 0,
         flexDirection: 'row', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingVertical: 12,
-        backgroundColor: '#F8FAFC', borderTopWidth: 1, borderTopColor: '#E2E8F0',
+        paddingHorizontal: 16, paddingVertical: 14,
+        backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F1F5F9',
+        shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 4,
     },
     manualButton: {
-        flex: 0.48, backgroundColor: '#e5e5ea', paddingVertical: 14,
-        borderRadius: 10, alignItems: 'center',
+        flex: 0.48, backgroundColor: '#F8FAFC', paddingVertical: 14,
+        borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0',
     },
-    manualButtonText: { color: '#1c1c1e', fontSize: 15, fontWeight: '600' },
+    manualButtonText: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
     generateButton: {
-        flex: 0.48, backgroundColor: '#007AFF', paddingVertical: 14,
-        borderRadius: 10, alignItems: 'center',
+        flex: 0.48, backgroundColor: colors.primary, paddingVertical: 14,
+        borderRadius: 12, alignItems: 'center',
+        shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
     },
-    generateButtonText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+    generateButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
     // Modal
     modalOverlay: {
-        flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end',
+        flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.45)', justifyContent: 'flex-end',
     },
     modalSheet: {
-        backgroundColor: '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+        backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24,
         padding: 20, paddingBottom: 36, maxHeight: '70%',
     },
     modalHandle: {
@@ -430,33 +449,33 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', paddingVertical: 14,
         borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
     },
-    groupOptionActive: { backgroundColor: '#EFF6FF', borderRadius: 8, paddingHorizontal: 8 },
+    groupOptionActive: { backgroundColor: colors.primarySubtle, borderRadius: 10, paddingHorizontal: 8 },
     groupOptionDot: { width: 12, height: 12, borderRadius: 6, marginRight: 12 },
-    groupOptionName: { flex: 1, fontSize: 15, fontWeight: '500', color: '#1E293B' },
+    groupOptionName: { flex: 1, fontSize: 15, fontWeight: '600', color: '#1E293B' },
     noGroupsText: { fontSize: 13, color: '#94A3B8', textAlign: 'center', paddingVertical: 20 },
     removeGroupOption: {
         flexDirection: 'row', alignItems: 'center', paddingVertical: 14,
         borderTopWidth: 1, borderTopColor: '#F1F5F9', marginTop: 8,
     },
-    removeGroupText: { fontSize: 15, color: '#EF4444', fontWeight: '500' },
+    removeGroupText: { fontSize: 15, color: '#EF4444', fontWeight: '600' },
     cancelOption: {
-        backgroundColor: '#F1F5F9', borderRadius: 10, paddingVertical: 14,
+        backgroundColor: '#F1F5F9', borderRadius: 12, paddingVertical: 14,
         alignItems: 'center', marginTop: 10,
     },
     cancelText: { fontSize: 15, fontWeight: '600', color: '#475569' },
     activeSessionBanner: {
-        backgroundColor: '#007AFF',
+        backgroundColor: colors.primary,
         marginHorizontal: 16,
         marginBottom: 16,
-        borderRadius: 12,
+        borderRadius: 14,
         padding: 16,
         flexDirection: 'row',
         alignItems: 'center',
-        elevation: 3,
-        shadowColor: '#007AFF',
+        elevation: 4,
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
+        shadowOpacity: 0.28,
+        shadowRadius: 8,
     },
     activeSessionBannerTextContainer: {
         flex: 1,
@@ -468,7 +487,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     activeSessionSubtitle: {
-        color: '#E5E7EB',
+        color: '#FCE7F0',
         fontSize: 14,
         marginTop: 2,
     },

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
 import { getDb } from '../database/db';
+import { colors } from '../theme/colors';
 
 interface ChartPoint {
     value: number; // Weight in kg
@@ -49,7 +50,7 @@ export const ExerciseProgressChart = ({ exerciseId }: { exerciseId: string }) =>
         if (exerciseId) fetchProgression();
     }, [exerciseId]);
 
-    if (loading) return <ActivityIndicator color="#6366f1" style={{ marginVertical: 20 }} />;
+    if (loading) return <ActivityIndicator color={colors.secondary} style={{ marginVertical: 20 }} />;
     if (chartData.length === 0) {
         return (
             <View style={styles.emptyContainer}>
@@ -67,13 +68,13 @@ export const ExerciseProgressChart = ({ exerciseId }: { exerciseId: string }) =>
                 height={180}
                 areaChart
                 curved
-                color="#6366f1"
-                startFillColor="#6366f1"
-                endFillColor="#6366f1"
+                color={colors.secondary}
+                startFillColor={colors.secondary}
+                endFillColor={colors.secondary}
                 startOpacity={0.25}
                 endOpacity={0.02}
                 thickness={3}
-                dataPointsColor="#6366f1"
+                dataPointsColor={colors.secondary}
                 dataPointsRadius={5}
                 textFontSize={11}
                 textColor="#475569"

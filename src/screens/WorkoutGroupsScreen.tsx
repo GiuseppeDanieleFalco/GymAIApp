@@ -9,10 +9,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
     getAllGroups, createGroup, deleteGroup, renameGroup, WorkoutGroup,
 } from '../database/groupQueries';
+import { colors } from '../theme/colors';
 
 const COLOR_PRESETS = [
+    '#720938', '#7C3AED', '#9F1239', '#5B21B6',
     '#2563EB', '#16A34A', '#DC2626', '#D97706',
-    '#7C3AED', '#0891B2', '#BE185D', '#EA580C',
 ];
 
 export default function WorkoutGroupsScreen() {
@@ -116,7 +117,7 @@ export default function WorkoutGroupsScreen() {
             {editingGroupId !== item.id && (
                 <View style={styles.groupActions}>
                     <TouchableOpacity onPress={() => handleStartRename(item)} style={styles.actionBtn}>
-                        <Ionicons name="pencil-outline" size={18} color="#2563EB" />
+                        <Ionicons name="pencil-outline" size={18} color={colors.primary} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleDelete(item)} style={styles.actionBtn}>
                         <Ionicons name="trash-outline" size={18} color="#EF4444" />
@@ -217,8 +218,9 @@ const styles = StyleSheet.create({
         borderWidth: 3, borderColor: '#0F172A',
     },
     createBtn: {
-        flexDirection: 'row', backgroundColor: '#2563EB', borderRadius: 10,
-        paddingVertical: 13, alignItems: 'center', justifyContent: 'center',
+        flexDirection: 'row', backgroundColor: colors.primary, borderRadius: 12,
+        paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
+        shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
     },
     createBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
 
