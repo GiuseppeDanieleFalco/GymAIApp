@@ -33,6 +33,12 @@ jobs:
           EXPO_PUBLIC_AI_KEY: ${{ secrets.EXPO_PUBLIC_AI_KEY }}
         run: npx expo prebuild --platform android
 
+      - name: Configure Gradle Properties
+        run: |
+          echo "org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError" >> android/gradle.properties
+          echo "org.gradle.parallel=true" >> android/gradle.properties
+          echo "org.gradle.caching=true" >> android/gradle.properties
+
       - name: Setup Java JDK with Gradle caching
         uses: actions/setup-java@v4
         with:
