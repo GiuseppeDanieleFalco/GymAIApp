@@ -45,7 +45,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace --debug
+          ./gradlew assembleRelease --no-daemon --stacktrace --info
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
