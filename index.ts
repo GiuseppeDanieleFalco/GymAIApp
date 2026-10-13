@@ -1,26 +1,26 @@
-import { registerRootComponent } from 'expo';
-import notifee, { EventType } from '@notifee/react-native';
+import { registerRootComponent } from 'expo'; import * as Notifications from 'expo-notifications';
 import { DeviceEventEmitter } from 'react-native';
+import { useEffect } from 'react';
 
 import App from './App';
 
-// Keep the foreground service alive
-notifee.registerForegroundService((notification) => {
-  return new Promise(() => {
-    // Promise remains unresolved to keep the service running
-  });
-});
+// Handle notification responses (when user clicks buttons inside the notification)
+export function useNotificationActions() {
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const actionId = response.actionIdentifier;
 
-// Handle background actions for the timer
-notifee.onBackgroundEvent(async ({ type, detail }) => {
-  if (type === EventType.ACTION_PRESS && detail.pressAction) {
-    if (detail.pressAction.id === 'add-30s') {
-      DeviceEventEmitter.emit('REST_TIMER_ADD_30S');
-    } else if (detail.pressAction.id === 'stop') {
-      DeviceEventEmitter.emit('REST_TIMER_STOP');
-    }
-  }
-});
+      // Match the action identifiers you configured on your notification
+      if (actionId === 'add-30s') {
+        DeviceEventEmitter.emit('REST_TIMER_ADD_30S');
+      } else if (actionId === 'stop') {
+        DeviceEventEmitter.emit('REST_TIMER_STOP');
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
+}
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
 // It also ensures that whether you load the app in Expo Go or in a native build,

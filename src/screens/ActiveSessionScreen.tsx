@@ -19,12 +19,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { getDb } from '../database/db';
-import notifee, { AndroidImportance, EventType, TriggerType } from '@notifee/react-native';
-import type { TimestampTrigger } from '@notifee/react-native';
 import { useActiveSessionStore, ExerciseItem } from '../store/activeSessionStore';
 import { findExerciseImageUrls, IMAGE_BASE_URL } from '../services/exerciseImageLookup';
 import { colors } from '../theme/colors';
 import HeaderBackButton from '../components/HeaderBackButton';
+import { useRestTimerNotifications } from '../hooks/useRestTimerNotifications';
 
 type RootStackParamList = {
     ActiveSession: { workoutId: string; workoutTitle: string };
@@ -78,38 +77,21 @@ export default function ActiveSessionScreen() {
     const showRestBarRef = useRef(false);
     const [showRestBar, setShowRestBar] = useState(false);
 
-    const showNotification = async () => {
-        await notifee.displayNotification(
-            {
-                title: 'Recupero Terminato',
-                body: 'Il tuo tempo di recupero è finito, torna ad allenarti! 💪',
-                android: { channelId: 'rest-end', sound: 'default' },
-            }
-        );
+
+    const add30s = () => {
+        const newTime = (restTimerRef.current || 0) + 30;
+        setRestTimer(newTime);
     };
 
-    // Richiede i permessi e crea il canale UNA SOLA VOLTA al mount,
-    // così scheduleNotification può essere chiamata in modo più leggero
-    // senza round-trip nativi aggiuntivi.
-    useEffect(() => {
-        const init = async () => {
-            await notifee.requestPermission();
-            await notifee.createChannel({
-                id: 'rest-end',
-                name: 'Recupero Terminato',
-                importance: AndroidImportance.HIGH,
-            });
-        };
-        init().catch(console.error);
-    }, []);
 
-    const cancelNotification = async () => {
-        if (notificationId.current) {
-            await notifee.cancelNotification(notificationId.current);
-            notificationId.current = null;
-        }
-        await notifee.stopForegroundService().catch(() => { });
+    const jumpTimer = () => {
+        setRestTimer(0);
+        setIsRestModalVisible(false);
+        cancelNotification();
     };
+
+
+    const { cancelNotification } = useRestTimerNotifications(restTimer, add30s, jumpTimer);
 
     // Gestione timer in background
     useEffect(() => {
@@ -240,44 +222,7 @@ export default function ActiveSessionScreen() {
         prevRestTimerForProgressRef.current = restTimer;
     }, [restTimer]);
 
-    const add30s = () => {
-        const newTime = (restTimerRef.current || 0) + 30;
-        setRestTimer(newTime);
-    };
 
-    // Registra il listener UNA SOLA VOLTA e lo rimuove allo smontaggio
-    useEffect(() => {
-        const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
-            // Se il trigger 'rest-end' viene consegnato mentre l'app è in foreground,
-            // lo cancelliamo subito: in-app timer + vibrazione gestiscono già la fine.
-            if (type === EventType.DELIVERED &&
-                detail.notification?.id &&
-                detail.notification.id === notificationId.current) {
-                await notifee.cancelNotification(detail.notification.id);
-                notificationId.current = null;
-                return;
-            }
-
-            if (type === EventType.ACTION_PRESS && detail?.pressAction?.id) {
-                switch (detail.pressAction.id) {
-                    case 'REST_TIMER_ADD_30S':
-                        add30s();
-                        break;
-                    case 'REST_TIMER_STOP':
-                        jumpTimer();
-                        break;
-                }
-            }
-        });
-        return () => unsubscribe();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    const jumpTimer = () => {
-        setRestTimer(0);
-        setIsRestModalVisible(false);
-        cancelNotification();
-    };
 
     // Timer Sessione Complessiva
     useEffect(() => {
@@ -286,45 +231,6 @@ export default function ActiveSessionScreen() {
         }, 1000);
         return () => clearInterval(timer);
     }, []);
-
-    // Aggiorna la notifica foreground in tempo reale
-    useEffect(() => {
-        if (restTimer !== null && restTimer > 0) {
-            const updateNotification = async () => {
-                try {
-                    const channelId = await notifee.createChannel({
-                        id: 'timer',
-                        name: 'Timer Recupero',
-                        importance: AndroidImportance.LOW,
-                    });
-                    const min = Math.floor(restTimer / 60);
-                    const sec = restTimer % 60;
-                    const formatted = `${min}:${sec.toString().padStart(2, '0')}`;
-
-                    await notifee.displayNotification({
-                        id: 'rest-timer',
-                        title: '⏳ Recupero in corso',
-                        body: `Tempo rimanente: ${formatted}`,
-                        android: {
-                            channelId,
-                            asForegroundService: true,
-                            ongoing: true,
-                            color: '#3498db',
-                            actions: [
-                                { title: '+30s', pressAction: { id: 'REST_TIMER_ADD_30S', launchActivity: 'default', } },
-                                { title: 'Stop', pressAction: { id: 'REST_TIMER_STOP', launchActivity: 'default', } }
-                            ],
-                        },
-                    });
-                } catch (e) {
-                    console.log('Errore Notifee:', e);
-                }
-            };
-            updateNotification();
-        } else if (restTimer === 0) {
-            notifee.stopForegroundService().catch(() => { });
-        }
-    }, [restTimer]);
 
     // Timer Recupero
     useEffect(() => {
@@ -338,7 +244,6 @@ export default function ActiveSessionScreen() {
                     Vibration.vibrate();
                     setIsRestModalVisible(false);
                     cancelNotification();
-                    showNotification();
                     return 0;
                 }
             });
