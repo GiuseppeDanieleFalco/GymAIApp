@@ -26,7 +26,7 @@ jobs:
       - name: Generate Native Android Directory
         env:
           EXPO_PUBLIC_AI_KEY: ${{ secrets.EXPO_PUBLIC_AI_KEY }}
-        run: npx expo prebuild --platform android
+        run: npx expo prebuild --platform android --clean
 
       - name: Run Expo Doctor Diagnostics
         run: npx expo-doctor || true
@@ -53,11 +53,11 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          export PATH="$(dirname $(which node)):$PATH"
+          # Force Node to print full trace on child process execution
+          export NODE_OPTIONS="--trace-warnings --unhandled-rejections=strict"
           ./gradlew assembleRelease \
             --no-daemon \
-            --info \
-            --stacktrace
+            --info
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
