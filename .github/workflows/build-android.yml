@@ -20,11 +20,6 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Clear Gradle Cache Directory
-        run: |
-          rm -rf ~/.gradle/caches/
-          rm -rf ~/.gradle/wrapper/
-
       - name: Install dependencies
         run: npm ci
 
@@ -32,12 +27,6 @@ jobs:
         env:
           EXPO_PUBLIC_AI_KEY: ${{ secrets.EXPO_PUBLIC_AI_KEY }}
         run: npx expo prebuild --platform android
-
-      - name: Configure Gradle Properties
-        run: |
-          echo "org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError" >> android/gradle.properties
-          echo "org.gradle.parallel=true" >> android/gradle.properties
-          echo "org.gradle.caching=true" >> android/gradle.properties
 
       - name: Setup Java JDK with Gradle caching
         uses: actions/setup-java@v4
@@ -49,12 +38,20 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
+      - name: Configure Gradle Properties
+        run: |
+          echo "org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError" >> android/gradle.properties
+          echo "org.gradle.parallel=true" >> android/gradle.properties
+          echo "org.gradle.caching=true" >> android/gradle.properties
+
       - name: Build APK with Gradle
         env:
           EXPO_PUBLIC_AI_KEY: ${{ secrets.EXPO_PUBLIC_AI_KEY }}
         run: |
           cd android
           chmod +x gradlew
+          # Ensure node is accessible to gradle subprocesses
+          export PATH="$(dirname $(which node)):$PATH"
           ./gradlew assembleRelease \
             --no-daemon \
             --stacktrace \
