@@ -32,14 +32,7 @@
       "expo-sqlite",
       "expo-font",
       "expo-video",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/notification-icon.png",
-          "color": "#ffffff",
-          "sounds": []
-        }
-      ]
+      "expo-notifications"
     ],
     "extra": {
       "eas": {
