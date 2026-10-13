@@ -55,7 +55,7 @@ jobs:
           ./gradlew assembleRelease \
             --no-daemon \
             --stacktrace \
-            --info \
+            --debug \
             --console=plain
 
       - name: Upload APK Artifact
