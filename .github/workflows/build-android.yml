@@ -31,7 +31,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
-          packages: "" # Bypasses the legacy package lookup bug on GitHub runners
+          packages: ""
 
       - name: Install Dependencies
         run: npm ci
@@ -46,8 +46,8 @@ jobs:
           cd android
           chmod +x gradlew
 
-          # Force Gradle wrapper to a stable 8.x release to prevent Gradle 9 autolinking crashes
-          ./gradlew wrapper --gradle-version 8.8
+          # Force Gradle wrapper to version 8.7 for full Expo autolinking Kotlin compatibility
+          ./gradlew wrapper --gradle-version 8.7
 
           # Execute the release build
           ./gradlew assembleRelease \
