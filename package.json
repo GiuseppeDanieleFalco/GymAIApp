@@ -32,6 +32,7 @@
     "@react-native/metro-config": "^0.86.3",
     "@types/react": "~19.2.2",
     "dotenv-cli": "^11.0.0",
+    "react-native-make": "^1.0.1",
     "typescript": "~6.0.3"
   },
   "scripts": {

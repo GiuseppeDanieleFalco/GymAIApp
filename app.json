@@ -7,7 +7,8 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.giudafa.GymAIApp"
     },
     "android": {
       "permissions": [
@@ -18,9 +19,9 @@
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/ic_launcher.png",
+        "backgroundImage": "./assets/ic_launcher.png",
+        "monochromeImage": "./assets/ic_launcher.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.giudafa.GymAIApp"
