@@ -23,12 +23,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.giudafa.GymAIApp",
-      "extraGradleProps": {
-        "org.gradle.jvmargs": "-Xmx2048m -XX:MaxMetaspaceSize=512m",
-        "org.gradle.daemon": "false",
-        "org.gradle.parallel": "false"
-      }
+      "package": "com.giudafa.GymAIApp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
